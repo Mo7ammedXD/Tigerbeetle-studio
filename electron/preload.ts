@@ -90,15 +90,10 @@ const api = {
 };
 
 // Expose the API to the renderer process
-console.log("🔧 Preload script executing...");
-console.log("🔧 contextBridge available:", !!contextBridge);
-console.log("🔧 ipcRenderer available:", !!ipcRenderer);
 
 try {
   contextBridge.exposeInMainWorld("tigerBeetleApi", api);
-  console.log("✅ TigerBeetle API exposed successfully!");
 } catch (error) {
-  console.error("❌ Failed to expose TigerBeetle API:", error);
 }
 
 // TypeScript declaration for window object

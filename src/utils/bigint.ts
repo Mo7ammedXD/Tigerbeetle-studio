@@ -20,7 +20,6 @@ export function formatTBAmount(
 
     return `${currency.symbol}${wholeStr}.${fractionStr}`;
   } catch (error) {
-    console.error("Failed to format amount:", amount, error);
     return `${currency.symbol}0.00`;
   }
 }
@@ -30,7 +29,6 @@ export function formatTBAmountRaw(amount: TB_Amount): string {
     const bigIntAmount = BigInt(amount);
     return bigIntAmount.toLocaleString("en-US");
   } catch (error) {
-    console.error("Failed to format raw amount:", amount, error);
     return "0";
   }
 }
@@ -55,7 +53,6 @@ export function compareTBAmount(a: TB_Amount, b: TB_Amount): number {
     const bigB = BigInt(b);
     return bigA > bigB ? 1 : bigA < bigB ? -1 : 0;
   } catch (error) {
-    console.error("Failed to compare amounts:", a, b, error);
     return 0;
   }
 }
@@ -126,7 +123,6 @@ export function formatTBTimestamp(
 
     return date.toLocaleString("en-US");
   } catch (error) {
-    console.error("Failed to format timestamp:", timestamp, error);
     return "Invalid Date";
   }
 }
@@ -140,7 +136,6 @@ export function formatTBTimestampISO(timestamp: TB_Timestamp): string {
     const date = new Date(milliseconds);
     return date.toISOString();
   } catch (error) {
-    console.error("Failed to format timestamp to ISO:", timestamp, error);
     return "Invalid Date";
   }
 }

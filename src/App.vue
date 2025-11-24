@@ -381,7 +381,6 @@ async function checkConnection() {
     isConnected.value = result.connected;
     connectionHealth.value = result.connected ? "healthy" : "disconnected";
   } catch (error) {
-    console.error("Failed to check connection:", error);
     isConnected.value = false;
     connectionHealth.value = "disconnected";
   }

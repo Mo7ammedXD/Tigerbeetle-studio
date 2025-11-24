@@ -320,7 +320,6 @@ async function loadAccounts() {
     const message =
       err instanceof Error ? err.message : "Failed to load accounts";
     error.value = message;
-    console.error("Failed to load accounts:", err);
   } finally {
     loading.value = false;
   }
@@ -349,7 +348,6 @@ async function deleteAccountConfirm(account: any) {
         await loadAccounts();
       }
     } catch (error) {
-      console.error("Failed to delete account:", error);
     }
   }
 }

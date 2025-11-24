@@ -747,7 +747,6 @@ onMounted(() => {
     try {
       savedQueries.value = JSON.parse(saved);
     } catch (e) {
-      console.error("Failed to load saved queries:", e);
     }
   }
 });

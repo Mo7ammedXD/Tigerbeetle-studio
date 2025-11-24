@@ -720,7 +720,6 @@ onMounted(() => {
     try {
       templates.value = JSON.parse(saved);
     } catch (e) {
-      console.error("Failed to load templates:", e);
     }
   }
 });

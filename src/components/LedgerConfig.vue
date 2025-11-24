@@ -609,7 +609,6 @@ onMounted(() => {
     try {
       ledgers.value = JSON.parse(saved);
     } catch (e) {
-      console.error("Failed to load ledgers:", e);
     }
   }
 

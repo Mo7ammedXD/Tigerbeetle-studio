@@ -487,7 +487,6 @@ onMounted(async () => {
     try {
       clusters.value = JSON.parse(saved);
     } catch (e) {
-      console.error("Failed to load clusters:", e);
     }
   }
 
@@ -497,7 +496,6 @@ onMounted(async () => {
     try {
       currentCluster.value = JSON.parse(current);
     } catch (e) {
-      console.error("Failed to load current cluster:", e);
     }
   }
 
@@ -525,7 +523,6 @@ onMounted(async () => {
       }
     }
   } catch (e) {
-    console.error("Failed to get connection config:", e);
   }
 });
 </script>

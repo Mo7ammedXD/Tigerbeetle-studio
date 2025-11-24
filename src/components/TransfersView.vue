@@ -278,7 +278,6 @@ async function loadTransfers() {
     const message =
       err instanceof Error ? err.message : "Failed to load transfers";
     error.value = message;
-    console.error("Failed to load transfers:", err);
   } finally {
     loading.value = false;
   }

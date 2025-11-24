@@ -316,7 +316,6 @@ async function loadAccounts() {
       }));
     }
   } catch (err) {
-    console.error("Failed to load accounts:", err);
   } finally {
     loadingAccounts.value = false;
   }

@@ -27,7 +27,6 @@ export function useCurrency() {
 
       isLoaded.value = true;
     } catch (error) {
-      console.error("Failed to load currency data:", error);
     }
   }
 

@@ -44,7 +44,6 @@ export function loadConfig() {
       ledgerConfigs.value = new Map(configs);
     }
   } catch (error) {
-    console.error("Failed to load config from localStorage:", error);
   }
 }
 

@@ -4,9 +4,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 // EXPOSED API
 // ============================================================================
 
-console.log('🔧 Preload script executing...');
-console.log('🔧 contextBridge available:', !!contextBridge);
-console.log('🔧 ipcRenderer available:', !!ipcRenderer);
 
 const api = {
   // Connection Management
@@ -51,7 +48,5 @@ const api = {
 
 try {
   contextBridge.exposeInMainWorld('tigerBeetleApi', api);
-  console.log('✅ TigerBeetle API exposed successfully!');
 } catch (error) {
-  console.error('❌ Failed to expose TigerBeetle API:', error);
 }

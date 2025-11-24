@@ -365,7 +365,6 @@ async function loadDashboardData() {
     avgResponseTime.value = endTime - startTime;
     lastSyncTime.value = new Date().toLocaleTimeString();
   } catch (error) {
-    console.error("Failed to load dashboard data:", error);
   }
 }
 

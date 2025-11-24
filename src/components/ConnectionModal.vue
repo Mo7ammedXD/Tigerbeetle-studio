@@ -152,7 +152,6 @@ onMounted(async () => {
       replicaAddresses.value = config.replica_addresses;
     }
   } catch (error) {
-    console.error("Failed to load connection config:", error);
   }
 });
 </script>

@@ -544,7 +544,6 @@ onMounted(() => {
     try {
       searchHistory.value = JSON.parse(saved);
     } catch (e) {
-      console.error("Failed to load search history:", e);
     }
   }
 });

@@ -12,7 +12,7 @@ const isDev = !app.isPackaged;
 function initializeLocalDatabase() {
   const userDataPath = app.getPath("userData");
   const dbPath = path.join(userDataPath, "tigerbeetle-studio.db");
-  console.log("📁 Initializing local database at:", dbPath);
+
   localDb = new Database(dbPath);
   localDb.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
@@ -51,11 +51,9 @@ function initializeLocalDatabase() {
     CREATE INDEX IF NOT EXISTS idx_transfers_credit ON transfers(credit_account_id);
   `);
   migrateDatabase();
-  console.log("✅ Local database initialized");
 }
 function migrateDatabase() {
   if (!localDb) return;
-  console.log("🔄 Running database migrations...");
   try {
     const accountColumns = localDb.pragma("table_info(accounts)");
     const accountColumnNames = accountColumns.map((col) => col.name);
@@ -75,7 +73,6 @@ function migrateDatabase() {
     ];
     for (const migration of accountMigrations) {
       if (!accountColumnNames.includes(migration.name)) {
-        console.log(`  ➕ Adding column: accounts.${migration.name}`);
         localDb.exec(migration.sql);
       }
     }
@@ -97,20 +94,19 @@ function migrateDatabase() {
     ];
     for (const migration of transferMigrations) {
       if (!transferColumnNames.includes(migration.name)) {
-        console.log(`  ➕ Adding column: transfers.${migration.name}`);
+
         localDb.exec(migration.sql);
       }
     }
-    console.log("✅ Database migrations completed");
+
   } catch (error) {
-    console.error("❌ Migration failed:", error.message);
+
   }
 }
 async function connectToTigerBeetle(config) {
   try {
-    console.log("🔌 Connecting to TigerBeetle...", config);
+
     if (tigerBeetleClient) {
-      console.log("Closing existing connection...");
       tigerBeetleClient = null;
     }
     tigerBeetleClient = createClient({
@@ -124,10 +120,9 @@ async function connectToTigerBeetle(config) {
       `);
       stmt.run(config.cluster_id, JSON.stringify(config.replica_addresses));
     }
-    console.log("✅ Connected to TigerBeetle");
+
     return { success: true };
   } catch (error) {
-    console.error("❌ Failed to connect to TigerBeetle:", error);
     throw new Error(`Connection failed: ${error.message}`);
   }
 }
@@ -145,7 +140,6 @@ function getStoredConnectionConfig() {
       };
     }
   } catch (error) {
-    console.error("Failed to get stored config:", error);
   }
   return null;
 }
@@ -184,7 +178,6 @@ async function createAccount(data) {
   }
   try {
     const accountId = data.id ? deserializeBigInt(data.id) : id();
-    console.log("📝 Creating account:", accountId.toString());
     const account = {
       id: accountId,
       debits_pending: 0n,
@@ -202,7 +195,6 @@ async function createAccount(data) {
     };
     const errors = await tigerBeetleClient.createAccounts([account]);
     if (errors.length > 0) {
-      console.error("TigerBeetle account creation errors:", errors);
       throw new Error(`Failed to create account: ${JSON.stringify(errors[0])}`);
     }
     const stmt = localDb.prepare(`
@@ -218,13 +210,11 @@ async function createAccount(data) {
       data.user_data_64 || null,
       data.user_data_32 || null
     );
-    console.log("✅ Account created successfully");
     return {
       success: true,
       id: accountId.toString()
     };
   } catch (error) {
-    console.error("❌ Failed to create account:", error);
     throw error;
   }
 }
@@ -236,7 +226,6 @@ async function getAccounts(limit = 100, offset = 0) {
     throw new Error("Local database not initialized");
   }
   try {
-    console.log(`📋 Fetching accounts (limit: ${limit}, offset: ${offset})...`);
     const countStmt = localDb.prepare("SELECT COUNT(*) as total FROM accounts");
     const countResult = countStmt.get();
     const total = countResult.total;
@@ -287,7 +276,6 @@ async function getAccounts(limit = 100, offset = 0) {
         exists: true
       };
     });
-    console.log(`✅ Fetched ${result.length} of ${total} accounts`);
     return {
       data: result,
       total,
@@ -295,7 +283,6 @@ async function getAccounts(limit = 100, offset = 0) {
       offset
     };
   } catch (error) {
-    console.error("❌ Failed to get accounts:", error);
     throw error;
   }
 }
@@ -304,13 +291,10 @@ async function deleteAccount(id2) {
     throw new Error("Local database not initialized");
   }
   try {
-    console.log("🗑️ Deleting account from local database:", id2);
     const stmt = localDb.prepare("DELETE FROM accounts WHERE id = ?");
     stmt.run(id2);
-    console.log("✅ Account deleted from local database");
     return { success: true };
   } catch (error) {
-    console.error("❌ Failed to delete account:", error);
     throw error;
   }
 }
@@ -323,7 +307,6 @@ async function createTransfer(data) {
   }
   try {
     const transferId = data.id ? deserializeBigInt(data.id) : id();
-    console.log("💸 Creating transfer:", transferId.toString());
     const transfer = {
       id: transferId,
       debit_account_id: deserializeBigInt(data.debit_account_id),
@@ -341,7 +324,6 @@ async function createTransfer(data) {
     };
     const errors = await tigerBeetleClient.createTransfers([transfer]);
     if (errors.length > 0) {
-      console.error("TigerBeetle transfer creation errors:", errors);
       throw new Error(
         `Failed to create transfer: ${JSON.stringify(errors[0])}`
       );
@@ -361,13 +343,11 @@ async function createTransfer(data) {
       data.user_data_64 || null,
       data.user_data_32 || null
     );
-    console.log("✅ Transfer created successfully");
     return {
       success: true,
       id: transferId.toString()
     };
   } catch (error) {
-    console.error("❌ Failed to create transfer:", error);
     throw error;
   }
 }
@@ -379,7 +359,6 @@ async function getTransfers(limit = 100, offset = 0) {
     throw new Error("Local database not initialized");
   }
   try {
-    console.log(
       `📋 Fetching transfers (limit: ${limit}, offset: ${offset})...`
     );
     const countStmt = localDb.prepare(
@@ -436,7 +415,6 @@ async function getTransfers(limit = 100, offset = 0) {
         exists: true
       };
     });
-    console.log(
       `✅ Fetched ${result.length} of ${total} transfers from TigerBeetle`
     );
     return {
@@ -446,7 +424,6 @@ async function getTransfers(limit = 100, offset = 0) {
       offset
     };
   } catch (error) {
-    console.error("❌ Failed to get transfers:", error);
     throw error;
   }
 }
@@ -521,9 +498,6 @@ function setupIpcHandlers() {
 }
 function createWindow() {
   const preloadPath = isDev ? path.join(__dirname$1, "preload.js") : path.join(__dirname$1, "preload.js");
-  console.log("🔧 Preload path:", preloadPath);
-  console.log("🔧 __dirname:", __dirname$1);
-  console.log("🔧 isDev:", isDev);
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -537,7 +511,6 @@ function createWindow() {
   if (isDev) {
     const port = process.env.VITE_DEV_SERVER_PORT || "5173";
     const url = `http://localhost:${port}`;
-    console.log("🔧 Loading URL:", url);
     mainWindow.loadURL(url);
     mainWindow.webContents.openDevTools();
   } else {
@@ -548,7 +521,6 @@ function createWindow() {
   });
 }
 app.whenReady().then(() => {
-  console.log("🚀 TigerBeetle Studio starting...");
   initializeLocalDatabase();
   setupIpcHandlers();
   createWindow();
@@ -568,7 +540,6 @@ app.on("window-all-closed", () => {
 });
 app.on("before-quit", () => {
   if (localDb) {
-    console.log("📁 Closing local database...");
     localDb.close();
   }
 });

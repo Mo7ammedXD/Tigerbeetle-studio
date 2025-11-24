@@ -391,7 +391,6 @@ const client = createClient({
 });
 
 // Use the client
-console.log('Connected to TigerBeetle');`;
 
     case "createAccount":
       return `import { createClient, Account } from 'tigerbeetle-node';
@@ -416,9 +415,7 @@ const account: Account = {
 
 const result = await client.createAccounts([account]);
 if (result.length === 0) {
-  console.log('Account created successfully');
 } else {
-  console.error('Failed to create account:', result);
 }`;
 
     case "createTransfer":
@@ -444,9 +441,7 @@ const transfer: Transfer = {
 
 const result = await client.createTransfers([transfer]);
 if (result.length === 0) {
-  console.log('Transfer created successfully');
 } else {
-  console.error('Failed to create transfer:', result);
 }`;
 
     case "lookupAccounts":
@@ -460,9 +455,7 @@ const client = createClient({ /* config */ });
 const accountIds = [${accountIds.map((id) => id.trim()).join(", ")}];
 const accounts = await client.lookupAccounts(accountIds);
 
-console.log(\`Found \${accounts.length} accounts\`);
 accounts.forEach(account => {
-  console.log(\`Account \${account.id}: Balance = \${account.credits_posted - account.debits_posted}\`);
 });`;
 
     case "lookupTransfers":
@@ -476,9 +469,7 @@ const client = createClient({ /* config */ });
 const transferIds = [${transferIds.map((id) => id.trim()).join(", ")}];
 const transfers = await client.lookupTransfers(transferIds);
 
-console.log(\`Found \${transfers.length} transfers\`);
 transfers.forEach(transfer => {
-  console.log(\`Transfer \${transfer.id}: \${transfer.amount}\`);
 });`;
 
     case "batch":
@@ -493,7 +484,6 @@ const accounts: Account[] = [
 ];
 
 const accountResults = await client.createAccounts(accounts);
-console.log(\`Created \${accounts.length - accountResults.length} accounts\`);
 
 // Create multiple transfers
 const transfers: Transfer[] = [
@@ -502,7 +492,6 @@ const transfers: Transfer[] = [
 ];
 
 const transferResults = await client.createTransfers(transfers);
-console.log(\`Created \${transfers.length - transferResults.length} transfers\`);`;
 
     default:
       return "// Select an operation to generate code";

@@ -652,7 +652,6 @@ function generateSQL(data: any): string {
 
 function downloadBackup(backup: any) {
   // Placeholder - would need to store backups somewhere
-  console.log("Download backup:", backup);
 }
 
 function formatBytes(bytes: number): string {
@@ -669,7 +668,6 @@ if (savedHistory) {
   try {
     backupHistory.value = JSON.parse(savedHistory);
   } catch (e) {
-    console.error("Failed to load backup history:", e);
   }
 }
 </script>
