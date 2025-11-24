@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Preload Test</title>
+</head>
+<body>
+    <h1>TigerBeetle API Test</h1>
+    <div id="status"></div>
+    <script>
+        const statusDiv = document.getElementById('status');
+        
+        if (window.tigerBeetleApi) {
+            statusDiv.innerHTML = '<p style="color: green;">✅ window.tigerBeetleApi is available!</p>';
+            statusDiv.innerHTML += '<pre>' + JSON.stringify(Object.keys(window.tigerBeetleApi), null, 2) + '</pre>';
+        } else {
+            statusDiv.innerHTML = '<p style="color: red;">❌ window.tigerBeetleApi is NOT available</p>';
+            statusDiv.innerHTML += '<p>Available on window: ' + Object.keys(window).join(', ') + '</p>';
+        }
+    </script>
+</body>
+</html>
