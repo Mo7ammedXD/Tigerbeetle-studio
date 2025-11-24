@@ -12,7 +12,6 @@ const isDev = !app.isPackaged;
 function initializeLocalDatabase() {
   const userDataPath = app.getPath("userData");
   const dbPath = path.join(userDataPath, "tigerbeetle-studio.db");
-
   localDb = new Database(dbPath);
   localDb.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
@@ -94,18 +93,14 @@ function migrateDatabase() {
     ];
     for (const migration of transferMigrations) {
       if (!transferColumnNames.includes(migration.name)) {
-
         localDb.exec(migration.sql);
       }
     }
-
   } catch (error) {
-
   }
 }
 async function connectToTigerBeetle(config) {
   try {
-
     if (tigerBeetleClient) {
       tigerBeetleClient = null;
     }
@@ -120,7 +115,6 @@ async function connectToTigerBeetle(config) {
       `);
       stmt.run(config.cluster_id, JSON.stringify(config.replica_addresses));
     }
-
     return { success: true };
   } catch (error) {
     throw new Error(`Connection failed: ${error.message}`);
@@ -359,8 +353,6 @@ async function getTransfers(limit = 100, offset = 0) {
     throw new Error("Local database not initialized");
   }
   try {
-      `📋 Fetching transfers (limit: ${limit}, offset: ${offset})...`
-    );
     const countStmt = localDb.prepare(
       "SELECT COUNT(*) as total FROM transfers"
     );
@@ -415,8 +407,6 @@ async function getTransfers(limit = 100, offset = 0) {
         exists: true
       };
     });
-      `✅ Fetched ${result.length} of ${total} transfers from TigerBeetle`
-    );
     return {
       data: result,
       total,

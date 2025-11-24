@@ -75,7 +75,6 @@ function initializeLocalDatabase() {
   const userDataPath = app.getPath("userData");
   const dbPath = path.join(userDataPath, "tigerbeetle-studio.db");
 
-
   localDb = new Database(dbPath);
 
   // Create tables
@@ -118,12 +117,10 @@ function initializeLocalDatabase() {
 
   // Run migrations for existing databases
   migrateDatabase();
-
 }
 
 function migrateDatabase() {
   if (!localDb) return;
-
 
   try {
     // Get current columns for accounts table
@@ -177,9 +174,7 @@ function migrateDatabase() {
         localDb.exec(migration.sql);
       }
     }
-
-  } catch (error: any) {
-  }
+  } catch (error: any) {}
 }
 
 // ============================================================================
@@ -188,7 +183,6 @@ function migrateDatabase() {
 
 async function connectToTigerBeetle(config: ConnectionConfig) {
   try {
-
     // Close existing connection if any
     if (tigerBeetleClient) {
       tigerBeetleClient = null;
@@ -230,8 +224,7 @@ function getStoredConnectionConfig(): ConnectionConfig | null {
         replica_addresses: JSON.parse(row.replica_addresses),
       };
     }
-  } catch (error) {
-  }
+  } catch (error) {}
 
   return null;
 }
@@ -315,7 +308,6 @@ async function createAccount(data: AccountData) {
     // Generate ID if not provided
     const accountId = data.id ? deserializeBigInt(data.id) : createId();
 
-
     // Create account in TigerBeetle
     const account = {
       id: accountId,
@@ -355,7 +347,6 @@ async function createAccount(data: AccountData) {
       data.user_data_32 || null
     );
 
-
     return {
       success: true,
       id: accountId.toString(),
@@ -375,7 +366,6 @@ async function getAccounts(limit: number = 100, offset: number = 0) {
   }
 
   try {
-
     // Get total count
     const countStmt = localDb.prepare("SELECT COUNT(*) as total FROM accounts");
     const countResult = countStmt.get() as { total: number };
@@ -459,7 +449,6 @@ async function deleteAccount(id: string) {
   }
 
   try {
-
     const stmt = localDb.prepare("DELETE FROM accounts WHERE id = ?");
     stmt.run(id);
 
@@ -485,7 +474,6 @@ async function createTransfer(data: TransferData) {
   try {
     // Generate ID if not provided
     const transferId = data.id ? deserializeBigInt(data.id) : createId();
-
 
     // Create transfer in TigerBeetle
     const transfer = {
@@ -530,7 +518,6 @@ async function createTransfer(data: TransferData) {
       data.user_data_32 || null
     );
 
-
     return {
       success: true,
       id: transferId.toString(),
@@ -550,9 +537,6 @@ async function getTransfers(limit: number = 100, offset: number = 0) {
   }
 
   try {
-      `📋 Fetching transfers (limit: ${limit}, offset: ${offset})...`
-    );
-
     // Get total count
     const countStmt = localDb.prepare(
       "SELECT COUNT(*) as total FROM transfers"
@@ -620,9 +604,6 @@ async function getTransfers(limit: number = 100, offset: number = 0) {
         exists: true,
       };
     });
-
-      `✅ Fetched ${result.length} of ${total} transfers from TigerBeetle`
-    );
     return {
       data: result,
       total,
@@ -729,7 +710,6 @@ function createWindow() {
     ? path.join(__dirname, "preload.js")
     : path.join(__dirname, "preload.js");
 
-
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -757,7 +737,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-
   // Initialize local database
   initializeLocalDatabase();
 

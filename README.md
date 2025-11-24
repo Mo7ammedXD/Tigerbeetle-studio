@@ -90,13 +90,56 @@ Display: ₿1.00000000
 
 ## 📦 Installation
 
-### Prerequisites
+### Option 1: Download Pre-Built Application (Recommended)
+
+**For End Users - No Development Setup Required**
+
+#### **macOS (Apple Silicon - M1/M2/M3)**
+
+1. **Download the latest release:**
+
+   - Go to [Releases](https://github.com/yourusername/tigerbeetle-studio/releases)
+   - Download `TigerBeetle Studio-0.1.0-arm64.dmg`
+
+2. **Install:**
+
+   - Open the downloaded `.dmg` file
+   - Drag "TigerBeetle Studio" to your Applications folder
+   - Launch from Applications
+
+3. **First Launch:**
+   - Right-click the app and select "Open" (required for unsigned apps)
+   - Click "Open" in the security dialog
+
+#### **macOS (Intel)**
+
+1. Download `TigerBeetle Studio-0.1.0-x64.dmg`
+2. Follow the same installation steps as above
+
+#### **Windows**
+
+1. Download `TigerBeetle Studio Setup 0.1.0.exe`
+2. Run the installer
+3. Follow the installation wizard
+4. Launch from Start Menu
+
+#### **Linux**
+
+1. Download `TigerBeetle Studio-0.1.0.AppImage`
+2. Make it executable: `chmod +x TigerBeetle\ Studio-0.1.0.AppImage`
+3. Run: `./TigerBeetle\ Studio-0.1.0.AppImage`
+
+---
+
+### Option 2: Build from Source (For Developers)
+
+#### **Prerequisites**
 
 - **Node.js**: v18 or higher
 - **npm**: v9 or higher
 - **TigerBeetle**: Latest version
 
-### Install Dependencies
+#### **Install Dependencies**
 
 ```bash
 # Clone the repository
@@ -109,6 +152,38 @@ npm install
 # Rebuild native modules for Electron
 npm run postinstall
 ```
+
+#### **Build the Application**
+
+```bash
+# Build for your current platform
+npm run electron:build
+
+# Output will be in the release/ directory:
+# - macOS: release/TigerBeetle Studio-0.1.0-arm64.dmg
+# - Windows: release/TigerBeetle Studio Setup 0.1.0.exe
+# - Linux: release/TigerBeetle Studio-0.1.0.AppImage
+```
+
+#### **Build Output Location**
+
+After running `npm run electron:build`, you'll find the built application in:
+
+```
+tigerbeetle-studio/
+└── release/
+    ├── TigerBeetle Studio-0.1.0-arm64.dmg       # macOS ARM64 installer
+    ├── TigerBeetle Studio-0.1.0-arm64.dmg.blockmap
+    ├── mac-arm64/                                # Unpacked macOS app
+    │   └── TigerBeetle Studio.app
+    └── builder-effective-config.yaml             # Build configuration
+```
+
+**To distribute your app:**
+
+1. Share the `.dmg` file (macOS), `.exe` (Windows), or `.AppImage` (Linux)
+2. Users can download and install directly
+3. No development environment needed for end users
 
 ---
 

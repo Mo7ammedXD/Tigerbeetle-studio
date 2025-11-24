@@ -3,11 +3,16 @@
     <!-- App Bar -->
     <v-app-bar color="surface" elevation="2" prominent>
       <template #prepend>
-        <v-icon size="40" color="primary" class="ml-2">mdi-tiger</v-icon>
+        <img
+          src="/logo.jpg"
+          alt="TigerBeetle Logo"
+          class="ml-2 app-logo"
+          style="height: 50px; width: auto; object-fit: contain"
+        />
       </template>
 
       <v-app-bar-title class="text-h5 font-weight-bold">
-        TigerBeetle Studio
+        Studio
       </v-app-bar-title>
 
       <template #append>
@@ -182,8 +187,6 @@
           color="primary"
         />
       </v-list>
-
-
     </v-navigation-drawer>
 
     <!-- Main Content -->
