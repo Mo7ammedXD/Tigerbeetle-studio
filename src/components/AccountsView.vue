@@ -88,6 +88,7 @@
 
           <template #item.balance="{ item }">
             <v-chip
+              dir="auto"
               :color="getBalanceColor(item.balance)"
               variant="flat"
               size="small"

@@ -1,14 +1,19 @@
-import A from "better-sqlite3";
-import { app as l, BrowserWindow as R, ipcMain as d } from "electron";
-import T from "path";
-import { createClient as C, id as S } from "tigerbeetle-node";
-import { fileURLToPath as y } from "url";
-const D = y(import.meta.url), L = T.dirname(D);
-let E = null, i = null, n = null;
-const h = !l.isPackaged;
-function U() {
-  const t = l.getPath("userData"), e = T.join(t, "tigerbeetle-studio.db");
-  n = new A(e), n.exec(`
+import Database from "better-sqlite3";
+import { app, BrowserWindow, ipcMain } from "electron";
+import path from "path";
+import { createClient, id } from "tigerbeetle-node";
+import { fileURLToPath } from "url";
+const __filename$1 = fileURLToPath(import.meta.url);
+const __dirname$1 = path.dirname(__filename$1);
+let mainWindow = null;
+let tigerBeetleClient = null;
+let localDb = null;
+const isDev = !app.isPackaged;
+function initializeLocalDatabase() {
+  const userDataPath = app.getPath("userData");
+  const dbPath = path.join(userDataPath, "tigerbeetle-studio.db");
+  localDb = new Database(dbPath);
+  localDb.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
       alias TEXT NOT NULL,
@@ -43,251 +48,317 @@ function U() {
     CREATE INDEX IF NOT EXISTS idx_accounts_ledger ON accounts(ledger);
     CREATE INDEX IF NOT EXISTS idx_transfers_debit ON transfers(debit_account_id);
     CREATE INDEX IF NOT EXISTS idx_transfers_credit ON transfers(credit_account_id);
-  `), F();
+  `);
+  migrateDatabase();
 }
-function F() {
-  if (n)
-    try {
-      const e = n.pragma("table_info(accounts)").map((c) => c.name), r = [
-        {
-          name: "user_data_128",
-          sql: "ALTER TABLE accounts ADD COLUMN user_data_128 TEXT"
-        },
-        {
-          name: "user_data_64",
-          sql: "ALTER TABLE accounts ADD COLUMN user_data_64 TEXT"
-        },
-        {
-          name: "user_data_32",
-          sql: "ALTER TABLE accounts ADD COLUMN user_data_32 INTEGER"
-        }
-      ];
-      for (const c of r)
-        e.includes(c.name) || n.exec(c.sql);
-      const _ = n.pragma("table_info(transfers)").map((c) => c.name), p = [
-        {
-          name: "user_data_128",
-          sql: "ALTER TABLE transfers ADD COLUMN user_data_128 TEXT"
-        },
-        {
-          name: "user_data_64",
-          sql: "ALTER TABLE transfers ADD COLUMN user_data_64 TEXT"
-        },
-        {
-          name: "user_data_32",
-          sql: "ALTER TABLE transfers ADD COLUMN user_data_32 INTEGER"
-        }
-      ];
-      for (const c of p)
-        _.includes(c.name) || n.exec(c.sql);
-    } catch {
-    }
-}
-async function X(t) {
+function migrateDatabase() {
+  if (!localDb) return;
   try {
-    return i && (i = null), i = C({
-      cluster_id: BigInt(t.cluster_id),
-      replica_addresses: t.replica_addresses
-    }), n && n.prepare(`
-        INSERT OR REPLACE INTO connection_config (id, cluster_id, replica_addresses, updated_at)
-        VALUES (1, ?, ?, strftime('%s', 'now'))
-      `).run(t.cluster_id, JSON.stringify(t.replica_addresses)), { success: !0 };
-  } catch (e) {
-    throw new Error(`Connection failed: ${e.message}`);
+    const accountColumns = localDb.pragma("table_info(accounts)");
+    const accountColumnNames = accountColumns.map((col) => col.name);
+    const accountMigrations = [
+      {
+        name: "user_data_128",
+        sql: "ALTER TABLE accounts ADD COLUMN user_data_128 TEXT"
+      },
+      {
+        name: "user_data_64",
+        sql: "ALTER TABLE accounts ADD COLUMN user_data_64 TEXT"
+      },
+      {
+        name: "user_data_32",
+        sql: "ALTER TABLE accounts ADD COLUMN user_data_32 INTEGER"
+      }
+    ];
+    for (const migration of accountMigrations) {
+      if (!accountColumnNames.includes(migration.name)) {
+        localDb.exec(migration.sql);
+      }
+    }
+    const transferColumns = localDb.pragma("table_info(transfers)");
+    const transferColumnNames = transferColumns.map((col) => col.name);
+    const transferMigrations = [
+      {
+        name: "user_data_128",
+        sql: "ALTER TABLE transfers ADD COLUMN user_data_128 TEXT"
+      },
+      {
+        name: "user_data_64",
+        sql: "ALTER TABLE transfers ADD COLUMN user_data_64 TEXT"
+      },
+      {
+        name: "user_data_32",
+        sql: "ALTER TABLE transfers ADD COLUMN user_data_32 INTEGER"
+      }
+    ];
+    for (const migration of transferMigrations) {
+      if (!transferColumnNames.includes(migration.name)) {
+        localDb.exec(migration.sql);
+      }
+    }
+  } catch (error) {
   }
 }
-function B() {
-  if (!n) return null;
+async function connectToTigerBeetle(config) {
   try {
-    const e = n.prepare(
+    if (tigerBeetleClient) {
+      tigerBeetleClient = null;
+    }
+    tigerBeetleClient = createClient({
+      cluster_id: BigInt(config.cluster_id),
+      replica_addresses: config.replica_addresses
+    });
+    if (localDb) {
+      const stmt = localDb.prepare(`
+        INSERT OR REPLACE INTO connection_config (id, cluster_id, replica_addresses, updated_at)
+        VALUES (1, ?, ?, strftime('%s', 'now'))
+      `);
+      stmt.run(config.cluster_id, JSON.stringify(config.replica_addresses));
+    }
+    return { success: true };
+  } catch (error) {
+    throw new Error(`Connection failed: ${error.message}`);
+  }
+}
+function getStoredConnectionConfig() {
+  if (!localDb) return null;
+  try {
+    const stmt = localDb.prepare(
       "SELECT cluster_id, replica_addresses FROM connection_config WHERE id = 1"
-    ).get();
-    if (e)
+    );
+    const row = stmt.get();
+    if (row) {
       return {
-        cluster_id: e.cluster_id,
-        replica_addresses: JSON.parse(e.replica_addresses)
+        cluster_id: row.cluster_id,
+        replica_addresses: JSON.parse(row.replica_addresses)
       };
-  } catch {
+    }
+  } catch (error) {
   }
   return null;
 }
-function u(t, e = 0n) {
-  if (!t) return e;
+function deserializeBigInt(value, defaultValue = 0n) {
+  if (!value) return defaultValue;
   try {
-    return BigInt(t);
+    return BigInt(value);
   } catch {
-    return e;
+    return defaultValue;
   }
 }
-function M(t) {
-  const e = [];
-  return t & 1 && e.push("linked"), t & 2 && e.push("debits_must_not_exceed_credits"), t & 4 && e.push("credits_must_not_exceed_debits"), t & 8 && e.push("history"), e;
+function decodeAccountFlags(flags) {
+  const result = [];
+  if (flags & 1) result.push("linked");
+  if (flags & 2) result.push("debits_must_not_exceed_credits");
+  if (flags & 4) result.push("credits_must_not_exceed_debits");
+  if (flags & 8) result.push("history");
+  return result;
 }
-function x(t) {
-  const e = [];
-  return t & 1 && e.push("linked"), t & 2 && e.push("pending"), t & 4 && e.push("post_pending_transfer"), t & 8 && e.push("void_pending_transfer"), t & 16 && e.push("balancing_debit"), t & 32 && e.push("balancing_credit"), e;
+function decodeTransferFlags(flags) {
+  const result = [];
+  if (flags & 1) result.push("linked");
+  if (flags & 2) result.push("pending");
+  if (flags & 4) result.push("post_pending_transfer");
+  if (flags & 8) result.push("void_pending_transfer");
+  if (flags & 16) result.push("balancing_debit");
+  if (flags & 32) result.push("balancing_credit");
+  return result;
 }
-async function G(t) {
-  if (!i)
+async function createAccount(data) {
+  if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
-  if (!n)
+  }
+  if (!localDb) {
     throw new Error("Local database not initialized");
+  }
   try {
-    const e = t.id ? u(t.id) : S(), r = {
-      id: e,
+    const accountId = data.id ? deserializeBigInt(data.id) : id();
+    const account = {
+      id: accountId,
       debits_pending: 0n,
       debits_posted: 0n,
       credits_pending: 0n,
       credits_posted: 0n,
-      user_data_128: u(t.user_data_128),
-      user_data_64: u(t.user_data_64),
-      user_data_32: t.user_data_32 || 0,
+      user_data_128: deserializeBigInt(data.user_data_128),
+      user_data_64: deserializeBigInt(data.user_data_64),
+      user_data_32: data.user_data_32 || 0,
       reserved: 0,
-      ledger: t.ledger,
-      code: t.code,
-      flags: t.flags || 0,
+      ledger: data.ledger,
+      code: data.code,
+      flags: data.flags || 0,
       timestamp: 0n
-    }, o = await i.createAccounts([r]);
-    if (o.length > 0)
-      throw new Error(`Failed to create account: ${JSON.stringify(o[0])}`);
-    return n.prepare(`
+    };
+    const errors = await tigerBeetleClient.createAccounts([account]);
+    if (errors.length > 0) {
+      throw new Error(`Failed to create account: ${JSON.stringify(errors[0])}`);
+    }
+    const stmt = localDb.prepare(`
       INSERT INTO accounts (id, alias, ledger, code, user_data_128, user_data_64, user_data_32)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      e.toString(),
-      t.alias,
-      t.ledger,
-      t.code,
-      t.user_data_128 || null,
-      t.user_data_64 || null,
-      t.user_data_32 || null
-    ), {
-      success: !0,
-      id: e.toString()
-    };
-  } catch (e) {
-    throw e;
-  }
-}
-async function P(t = 100, e = 0) {
-  if (!i)
-    throw new Error("Not connected to TigerBeetle");
-  if (!n)
-    throw new Error("Local database not initialized");
-  try {
-    const _ = n.prepare("SELECT COUNT(*) as total FROM accounts").get().total, c = n.prepare(
-      "SELECT * FROM accounts ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    ).all(t, e);
-    if (c.length === 0)
-      return [];
-    const g = c.map((s) => BigInt(s.id)), m = await i.lookupAccounts(g), N = new Map(
-      m.map((s) => [s.id.toString(), s])
+    `);
+    stmt.run(
+      accountId.toString(),
+      data.alias,
+      data.ledger,
+      data.code,
+      data.user_data_128 || null,
+      data.user_data_64 || null,
+      data.user_data_32 || null
     );
     return {
-      data: c.map((s) => {
-        const a = N.get(s.id);
-        if (!a)
-          return {
-            id: s.id,
-            alias: s.alias,
-            ledger: s.ledger,
-            code: s.code,
-            debits_posted: "0",
-            credits_posted: "0",
-            balance: "0",
-            exists: !1
-          };
-        const f = a.debits_posted.toString(), O = a.credits_posted.toString(), b = (a.credits_posted - a.debits_posted).toString();
-        return {
-          id: s.id,
-          alias: s.alias,
-          ledger: s.ledger,
-          code: s.code,
-          debits_posted: f,
-          credits_posted: O,
-          debits_pending: a.debits_pending.toString(),
-          credits_pending: a.credits_pending.toString(),
-          balance: b,
-          user_data_128: a.user_data_128.toString(),
-          user_data_64: a.user_data_64.toString(),
-          user_data_32: a.user_data_32,
-          timestamp: a.timestamp.toString(),
-          flags: M(a.flags || 0),
-          exists: !0
-        };
-      }),
-      total: _,
-      limit: t,
-      offset: e
+      success: true,
+      id: accountId.toString()
     };
-  } catch (r) {
-    throw r;
+  } catch (error) {
+    throw error;
   }
 }
-async function v(t) {
-  if (!n)
-    throw new Error("Local database not initialized");
-  try {
-    return n.prepare("DELETE FROM accounts WHERE id = ?").run(t), { success: !0 };
-  } catch (e) {
-    throw e;
-  }
-}
-async function q(t) {
-  if (!i)
+async function getAccounts(limit = 100, offset = 0) {
+  if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
-  if (!n)
+  }
+  if (!localDb) {
     throw new Error("Local database not initialized");
+  }
   try {
-    const e = t.id ? u(t.id) : S(), r = {
-      id: e,
-      debit_account_id: u(t.debit_account_id),
-      credit_account_id: u(t.credit_account_id),
-      amount: u(t.amount),
+    const countStmt = localDb.prepare("SELECT COUNT(*) as total FROM accounts");
+    const countResult = countStmt.get();
+    const total = countResult.total;
+    const stmt = localDb.prepare(
+      "SELECT * FROM accounts ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    );
+    const localAccounts = stmt.all(limit, offset);
+    if (localAccounts.length === 0) {
+      return [];
+    }
+    const ids = localAccounts.map((acc) => BigInt(acc.id));
+    const tbAccounts = await tigerBeetleClient.lookupAccounts(ids);
+    const accountsMap = new Map(
+      tbAccounts.map((acc) => [acc.id.toString(), acc])
+    );
+    const result = localAccounts.map((localAcc) => {
+      const tbAcc = accountsMap.get(localAcc.id);
+      if (!tbAcc) {
+        return {
+          id: localAcc.id,
+          alias: localAcc.alias,
+          ledger: localAcc.ledger,
+          code: localAcc.code,
+          debits_posted: "0",
+          credits_posted: "0",
+          balance: "0",
+          exists: false
+        };
+      }
+      const debits = tbAcc.debits_posted.toString();
+      const credits = tbAcc.credits_posted.toString();
+      const balance = (tbAcc.credits_posted - tbAcc.debits_posted).toString();
+      return {
+        id: localAcc.id,
+        alias: localAcc.alias,
+        ledger: localAcc.ledger,
+        code: localAcc.code,
+        debits_posted: debits,
+        credits_posted: credits,
+        debits_pending: tbAcc.debits_pending.toString(),
+        credits_pending: tbAcc.credits_pending.toString(),
+        balance,
+        user_data_128: tbAcc.user_data_128.toString(),
+        user_data_64: tbAcc.user_data_64.toString(),
+        user_data_32: tbAcc.user_data_32,
+        timestamp: tbAcc.timestamp.toString(),
+        flags: decodeAccountFlags(tbAcc.flags || 0),
+        exists: true
+      };
+    });
+    return {
+      data: result,
+      total,
+      limit,
+      offset
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+async function deleteAccount(id2) {
+  if (!localDb) {
+    throw new Error("Local database not initialized");
+  }
+  try {
+    const stmt = localDb.prepare("DELETE FROM accounts WHERE id = ?");
+    stmt.run(id2);
+    return { success: true };
+  } catch (error) {
+    throw error;
+  }
+}
+async function createTransfer(data) {
+  if (!tigerBeetleClient) {
+    throw new Error("Not connected to TigerBeetle");
+  }
+  if (!localDb) {
+    throw new Error("Local database not initialized");
+  }
+  try {
+    const transferId = data.id ? deserializeBigInt(data.id) : id();
+    const transfer = {
+      id: transferId,
+      debit_account_id: deserializeBigInt(data.debit_account_id),
+      credit_account_id: deserializeBigInt(data.credit_account_id),
+      amount: deserializeBigInt(data.amount),
       pending_id: 0n,
-      user_data_128: u(t.user_data_128),
-      user_data_64: u(t.user_data_64),
-      user_data_32: t.user_data_32 || 0,
+      user_data_128: deserializeBigInt(data.user_data_128),
+      user_data_64: deserializeBigInt(data.user_data_64),
+      user_data_32: data.user_data_32 || 0,
       timeout: 0,
-      ledger: t.ledger,
-      code: t.code,
-      flags: t.flags || 0,
+      ledger: data.ledger,
+      code: data.code,
+      flags: data.flags || 0,
       timestamp: 0n
-    }, o = await i.createTransfers([r]);
-    if (o.length > 0)
+    };
+    const errors = await tigerBeetleClient.createTransfers([transfer]);
+    if (errors.length > 0) {
       throw new Error(
-        `Failed to create transfer: ${JSON.stringify(o[0])}`
+        `Failed to create transfer: ${JSON.stringify(errors[0])}`
       );
-    return n.prepare(`
+    }
+    const stmt = localDb.prepare(`
       INSERT INTO transfers (id, debit_account_id, credit_account_id, amount, ledger, code, user_data_128, user_data_64, user_data_32)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      e.toString(),
-      t.debit_account_id,
-      t.credit_account_id,
-      t.amount,
-      t.ledger,
-      t.code,
-      t.user_data_128 || null,
-      t.user_data_64 || null,
-      t.user_data_32 || null
-    ), {
-      success: !0,
-      id: e.toString()
+    `);
+    stmt.run(
+      transferId.toString(),
+      data.debit_account_id,
+      data.credit_account_id,
+      data.amount,
+      data.ledger,
+      data.code,
+      data.user_data_128 || null,
+      data.user_data_64 || null,
+      data.user_data_32 || null
+    );
+    return {
+      success: true,
+      id: transferId.toString()
     };
-  } catch (e) {
-    throw e;
+  } catch (error) {
+    throw error;
   }
 }
-async function Y(t = 100, e = 0) {
-  if (!i)
+async function getTransfers(limit = 100, offset = 0) {
+  if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
-  if (!n)
+  }
+  if (!localDb) {
     throw new Error("Local database not initialized");
+  }
   try {
-    const _ = n.prepare(
+    const countStmt = localDb.prepare(
       "SELECT COUNT(*) as total FROM transfers"
-    ).get().total, c = n.prepare(`
+    );
+    const countResult = countStmt.get();
+    const total = countResult.total;
+    const stmt = localDb.prepare(`
       SELECT 
         t.*,
         da.alias as debit_alias,
@@ -297,120 +368,168 @@ async function Y(t = 100, e = 0) {
       LEFT JOIN accounts ca ON t.credit_account_id = ca.id
       ORDER BY t.created_at DESC
       LIMIT ? OFFSET ?
-    `).all(t, e);
-    if (c.length === 0)
+    `);
+    const localTransfers = stmt.all(limit, offset);
+    if (localTransfers.length === 0) {
       return [];
-    const g = c.map((s) => BigInt(s.id)), m = await i.lookupTransfers(g), N = new Map(
-      m.map((s) => [s.id.toString(), s])
+    }
+    const transferIds = localTransfers.map((t) => BigInt(t.id));
+    const tbTransfers = await tigerBeetleClient.lookupTransfers(transferIds);
+    const tbTransfersMap = new Map(
+      tbTransfers.map((t) => [t.id.toString(), t])
     );
-    return {
-      data: c.map((s) => {
-        var f;
-        const a = N.get(s.id);
-        return a ? {
-          id: s.id,
-          debit_account_id: s.debit_account_id,
-          credit_account_id: s.credit_account_id,
-          debit_alias: s.debit_alias,
-          credit_alias: s.credit_alias,
-          amount: a.amount.toString(),
-          ledger: a.ledger,
-          code: a.code,
-          flags: x(a.flags || 0),
-          pending_id: ((f = a.pending_id) == null ? void 0 : f.toString()) || "0",
-          timeout: a.timeout || 0,
-          timestamp: a.timestamp.toString(),
-          user_data_128: a.user_data_128.toString(),
-          user_data_64: a.user_data_64.toString(),
-          user_data_32: a.user_data_32,
-          created_at: s.created_at,
-          exists: !0
-        } : {
-          ...s,
-          exists: !1
+    const result = localTransfers.map((localTransfer) => {
+      var _a;
+      const tbTransfer = tbTransfersMap.get(localTransfer.id);
+      if (!tbTransfer) {
+        return {
+          ...localTransfer,
+          exists: false
         };
-      }),
-      total: _,
-      limit: t,
-      offset: e
+      }
+      return {
+        id: localTransfer.id,
+        debit_account_id: localTransfer.debit_account_id,
+        credit_account_id: localTransfer.credit_account_id,
+        debit_alias: localTransfer.debit_alias,
+        credit_alias: localTransfer.credit_alias,
+        amount: tbTransfer.amount.toString(),
+        ledger: tbTransfer.ledger,
+        code: tbTransfer.code,
+        flags: decodeTransferFlags(tbTransfer.flags || 0),
+        pending_id: ((_a = tbTransfer.pending_id) == null ? void 0 : _a.toString()) || "0",
+        timeout: tbTransfer.timeout || 0,
+        timestamp: tbTransfer.timestamp.toString(),
+        user_data_128: tbTransfer.user_data_128.toString(),
+        user_data_64: tbTransfer.user_data_64.toString(),
+        user_data_32: tbTransfer.user_data_32,
+        created_at: localTransfer.created_at,
+        exists: true
+      };
+    });
+    return {
+      data: result,
+      total,
+      limit,
+      offset
     };
-  } catch (r) {
-    throw r;
+  } catch (error) {
+    throw error;
   }
 }
-function z() {
-  d.handle("connect", async (t, e) => {
+function setupIpcHandlers() {
+  ipcMain.handle("connect", async (_event, config) => {
     try {
-      return await X(e), { success: !0 };
-    } catch (r) {
-      return { success: !1, error: r.message };
+      await connectToTigerBeetle(config);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
     }
-  }), d.handle("get-connection-config", async () => B()), d.handle("disconnect", async () => i ? (i = null, { success: !0 }) : { success: !1, error: "Not connected" }), d.handle("is-connected", async () => ({ connected: i !== null })), d.handle("create-account", async (t, e) => {
+  });
+  ipcMain.handle("get-connection-config", async () => {
+    return getStoredConnectionConfig();
+  });
+  ipcMain.handle("disconnect", async () => {
+    if (tigerBeetleClient) {
+      tigerBeetleClient = null;
+      return { success: true };
+    }
+    return { success: false, error: "Not connected" };
+  });
+  ipcMain.handle("is-connected", async () => {
+    return { connected: tigerBeetleClient !== null };
+  });
+  ipcMain.handle("create-account", async (_event, data) => {
     try {
-      return await G(e);
-    } catch (r) {
-      return { success: !1, error: r.message };
+      const result = await createAccount(data);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
     }
-  }), d.handle(
+  });
+  ipcMain.handle(
     "get-accounts",
-    async (t, e, r) => {
+    async (_event, limit, offset) => {
       try {
-        return { success: !0, data: await P(e, r) };
-      } catch (o) {
-        return { success: !1, error: o.message };
+        const result = await getAccounts(limit, offset);
+        return { success: true, data: result };
+      } catch (error) {
+        return { success: false, error: error.message };
       }
     }
-  ), d.handle("delete-account", async (t, e) => {
+  );
+  ipcMain.handle("delete-account", async (_event, id2) => {
     try {
-      return await v(e);
-    } catch (r) {
-      return { success: !1, error: r.message };
+      const result = await deleteAccount(id2);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
     }
-  }), d.handle("create-transfer", async (t, e) => {
+  });
+  ipcMain.handle("create-transfer", async (_event, data) => {
     try {
-      return await q(e);
-    } catch (r) {
-      return { success: !1, error: r.message };
+      const result = await createTransfer(data);
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
     }
-  }), d.handle(
+  });
+  ipcMain.handle(
     "get-transfers",
-    async (t, e, r) => {
+    async (_event, limit, offset) => {
       try {
-        return { success: !0, data: await Y(e, r) };
-      } catch (o) {
-        return { success: !1, error: o.message };
+        const result = await getTransfers(limit, offset);
+        return { success: true, data: result };
+      } catch (error) {
+        return { success: false, error: error.message };
       }
     }
   );
 }
-function w() {
-  const t = h ? T.join(L, "preload.js") : T.join(L, "preload.js");
-  if (E = new R({
+function createWindow() {
+  const preloadPath = isDev ? path.join(__dirname$1, "preload.js") : path.join(__dirname$1, "preload.js");
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: t,
-      nodeIntegration: !1,
-      contextIsolation: !0
+      preload: preloadPath,
+      nodeIntegration: false,
+      contextIsolation: true
     },
     title: "TigerBeetle Studio"
-  }), h) {
-    const r = `http://localhost:${process.env.VITE_DEV_SERVER_PORT || "5173"}`;
-    E.loadURL(r), E.webContents.openDevTools();
-  } else
-    E.loadFile(T.join(L, "../dist/index.html"));
-  E.on("closed", () => {
-    E = null;
+  });
+  if (isDev) {
+    const port = process.env.VITE_DEV_SERVER_PORT || "5173";
+    const url = `http://localhost:${port}`;
+    mainWindow.loadURL(url);
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname$1, "../dist/index.html"));
+  }
+  mainWindow.on("closed", () => {
+    mainWindow = null;
   });
 }
-l.whenReady().then(() => {
-  U(), z(), w(), l.on("activate", () => {
-    R.getAllWindows().length === 0 && w();
+app.whenReady().then(() => {
+  initializeLocalDatabase();
+  setupIpcHandlers();
+  createWindow();
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
   });
 });
-l.on("window-all-closed", () => {
-  process.platform !== "darwin" && (n && n.close(), l.quit());
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    if (localDb) {
+      localDb.close();
+    }
+    app.quit();
+  }
 });
-l.on("before-quit", () => {
-  n && n.close();
+app.on("before-quit", () => {
+  if (localDb) {
+    localDb.close();
+  }
 });
