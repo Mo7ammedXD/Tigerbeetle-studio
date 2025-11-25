@@ -1,18 +1,37 @@
-const { contextBridge: t, ipcRenderer: e } = require("electron"), r = {
+const { contextBridge, ipcRenderer } = require("electron");
+const api = {
   // Connection Management
-  connect: (n) => e.invoke("connect", n),
-  disconnect: () => e.invoke("disconnect"),
-  isConnected: () => e.invoke("is-connected"),
-  getConnectionConfig: () => e.invoke("get-connection-config"),
+  connect: (config) => {
+    return ipcRenderer.invoke("connect", config);
+  },
+  disconnect: () => {
+    return ipcRenderer.invoke("disconnect");
+  },
+  isConnected: () => {
+    return ipcRenderer.invoke("is-connected");
+  },
+  getConnectionConfig: () => {
+    return ipcRenderer.invoke("get-connection-config");
+  },
   // Account Management
-  createAccount: (n) => e.invoke("create-account", n),
-  getAccounts: () => e.invoke("get-accounts"),
-  deleteAccount: (n) => e.invoke("delete-account", n),
+  createAccount: (data) => {
+    return ipcRenderer.invoke("create-account", data);
+  },
+  getAccounts: () => {
+    return ipcRenderer.invoke("get-accounts");
+  },
+  deleteAccount: (id) => {
+    return ipcRenderer.invoke("delete-account", id);
+  },
   // Transfer Management
-  createTransfer: (n) => e.invoke("create-transfer", n),
-  getTransfers: () => e.invoke("get-transfers")
+  createTransfer: (data) => {
+    return ipcRenderer.invoke("create-transfer", data);
+  },
+  getTransfers: () => {
+    return ipcRenderer.invoke("get-transfers");
+  }
 };
 try {
-  t.exposeInMainWorld("tigerBeetleApi", r);
-} catch {
+  contextBridge.exposeInMainWorld("tigerBeetleApi", api);
+} catch (error) {
 }

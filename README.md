@@ -259,8 +259,7 @@ tigerbeetle-studio/
 │   │   ├── ClusterManager.vue
 │   │   ├── LedgerConfig.vue
 │   │   ├── DataVisualization.vue
-│   │   ├── FlowVisualizer.vue
-│   │   └── CodeGenerator.vue
+│   |   └─── FlowVisualizer.vue
 │   ├── composables/         # Vue composables
 │   │   ├── useCurrency.ts
 │   │   └── useKeyboardShortcuts.ts

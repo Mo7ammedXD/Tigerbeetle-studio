@@ -171,14 +171,6 @@
           @click="activeView = 'flow'"
           color="primary"
         />
-        <v-list-item
-          prepend-icon="mdi-code-braces"
-          title="Code Generator"
-          value="codegen"
-          :active="activeView === 'codegen'"
-          @click="activeView = 'codegen'"
-          color="primary"
-        />
       </v-list>
     </v-navigation-drawer>
 
@@ -246,10 +238,6 @@
           v-else-if="activeView === 'flow'"
           :is-connected="isConnected"
         />
-        <CodeGenerator
-          v-else-if="activeView === 'codegen'"
-          :is-connected="isConnected"
-        />
       </v-container>
     </v-main>
 
@@ -271,7 +259,6 @@ import AdvancedSearch from "./components/AdvancedSearch.vue";
 import BackupExport from "./components/BackupExport.vue";
 import BulkOperations from "./components/BulkOperations.vue";
 import ClusterManager from "./components/ClusterManager.vue";
-import CodeGenerator from "./components/CodeGenerator.vue";
 import ConnectionModal from "./components/ConnectionModal.vue";
 import Dashboard from "./components/Dashboard.vue";
 import DataVisualization from "./components/DataVisualization.vue";
@@ -298,8 +285,7 @@ type ViewType =
   | "clusters"
   | "ledgerconfig"
   | "visualization"
-  | "flow"
-  | "codegen";
+  | "flow";
 const activeView = ref<ViewType>("dashboard");
 const isConnected = ref(false);
 const showConnectionModal = ref(false);
