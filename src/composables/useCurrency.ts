@@ -2,24 +2,24 @@ import type { CurrencyConfig, LedgerConfig } from "@/types/tigerbeetle";
 import { DEFAULT_CURRENCY } from "@/types/tigerbeetle";
 import { computed, ref } from "vue";
 
-// Global reactive state
+
 const globalCurrency = ref<CurrencyConfig>({ ...DEFAULT_CURRENCY });
 const ledgerConfigs = ref<LedgerConfig[]>([]);
 const isLoaded = ref(false);
 
 export function useCurrency() {
-  // Load currency data from localStorage
+  
   function loadCurrency() {
     if (isLoaded.value) return;
 
     try {
-      // Load global currency
+      
       const savedGlobal = localStorage.getItem("tigerbeetle_global_currency");
       if (savedGlobal) {
         globalCurrency.value = JSON.parse(savedGlobal);
       }
 
-      // Load ledger configurations
+      
       const savedLedgers = localStorage.getItem("tigerbeetle_ledger_configs");
       if (savedLedgers) {
         ledgerConfigs.value = JSON.parse(savedLedgers);
@@ -30,7 +30,7 @@ export function useCurrency() {
     }
   }
 
-  // Get currency for a specific ledger ID
+  
   function getCurrencyForLedger(ledgerId: number | string): CurrencyConfig {
     loadCurrency();
 
@@ -41,7 +41,7 @@ export function useCurrency() {
     return ledger?.currency || globalCurrency.value;
   }
 
-  // Set global currency
+  
   function setGlobalCurrency(currency: CurrencyConfig) {
     globalCurrency.value = { ...currency };
     localStorage.setItem(
@@ -50,21 +50,21 @@ export function useCurrency() {
     );
   }
 
-  // Update ledger configurations (called when ledgers change)
+  
   function updateLedgerConfigs(ledgers: LedgerConfig[]) {
     ledgerConfigs.value = ledgers;
   }
 
-  // Get all available currencies from ledger configs
+  
   function getAvailableCurrencies(): CurrencyConfig[] {
     loadCurrency();
 
     const currencies = new Map<string, CurrencyConfig>();
 
-    // Add global currency
+    
     currencies.set(globalCurrency.value.code, globalCurrency.value);
 
-    // Add currencies from all ledgers
+    
     ledgerConfigs.value.forEach((ledger) => {
       if (ledger.currency) {
         currencies.set(ledger.currency.code, ledger.currency);
@@ -74,7 +74,7 @@ export function useCurrency() {
     return Array.from(currencies.values());
   }
 
-  // Get ledger name by ID
+  
   function getLedgerName(ledgerId: number | string): string {
     loadCurrency();
 
@@ -85,7 +85,7 @@ export function useCurrency() {
     return ledger?.name || `Ledger ${ledgerId}`;
   }
 
-  // Get account code name
+  
   function getAccountCodeName(ledgerId: number | string, code: number): string {
     loadCurrency();
 
@@ -97,7 +97,7 @@ export function useCurrency() {
     return codeDefinition?.name || `Code ${code}`;
   }
 
-  // Get transfer code name
+  
   function getTransferCodeName(
     ledgerId: number | string,
     code: number
@@ -113,11 +113,11 @@ export function useCurrency() {
   }
 
   return {
-    // Reactive state
+    
     globalCurrency: computed(() => globalCurrency.value),
     ledgerConfigs: computed(() => ledgerConfigs.value),
 
-    // Methods
+    
     loadCurrency,
     getCurrencyForLedger,
     setGlobalCurrency,
