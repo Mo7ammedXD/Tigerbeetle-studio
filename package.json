@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build && electron-builder",
+    "build": "vite build && electron-builder",
+    "build:check": "vue-tsc && vite build && electron-builder",
     "preview": "vite preview",
     "postinstall": "electron-rebuild",
     "electron:dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
