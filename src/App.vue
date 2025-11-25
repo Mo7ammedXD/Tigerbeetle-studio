@@ -1,6 +1,5 @@
 <template>
   <v-app>
-    
     <v-app-bar color="surface" elevation="2" prominent>
       <template #prepend>
         <img
@@ -45,7 +44,6 @@
       </template>
     </v-app-bar>
 
-    
     <v-navigation-drawer permanent width="280">
       <v-list density="compact" nav>
         <v-list-subheader>OVERVIEW</v-list-subheader>
@@ -184,7 +182,6 @@
       </v-list>
     </v-navigation-drawer>
 
-    
     <v-main>
       <v-container fluid class="pa-6">
         <Dashboard
@@ -256,13 +253,11 @@
       </v-container>
     </v-main>
 
-    
     <ConnectionModal
       v-model="showConnectionModal"
       @connected="handleConnected"
     />
 
-    
     <KeyboardShortcutsDialog ref="shortcutsDialog" />
   </v-app>
 </template>
@@ -316,7 +311,6 @@ const shortcutsDialog = ref<InstanceType<typeof KeyboardShortcutsDialog>>();
 const theme = useTheme();
 let healthCheckInterval: number | null = null;
 
-
 const savedDarkMode = localStorage.getItem("tigerbeetle_dark_mode");
 if (savedDarkMode) {
   darkMode.value = savedDarkMode === "true";
@@ -333,8 +327,8 @@ function showShortcuts() {
   shortcutsDialog.value?.show();
 }
 
-
 useKeyboardShortcuts([
+  // Navigation
   {
     key: "1",
     ctrl: true,
@@ -354,16 +348,48 @@ useKeyboardShortcuts([
     action: () => (activeView.value = "transfers"),
   },
   {
+    key: "4",
+    ctrl: true,
+    description: "Go to Query Builder",
+    action: () => (activeView.value = "query"),
+  },
+  {
+    key: "5",
+    ctrl: true,
+    description: "Go to Account History",
+    action: () => (activeView.value = "history"),
+  },
+  // Actions
+  {
+    key: "r",
+    ctrl: true,
+    description: "Refresh Data",
+    action: checkConnection,
+  },
+  {
+    key: "f",
+    ctrl: true,
+    description: "Go to Search",
+    action: () => (activeView.value = "search"),
+  },
+  {
+    key: "e",
+    ctrl: true,
+    description: "Go to Export/Backup",
+    action: () => (activeView.value = "backup"),
+  },
+  // Views
+  {
     key: "d",
     ctrl: true,
     description: "Toggle Dark Mode",
     action: toggleDarkMode,
   },
   {
-    key: "r",
+    key: "k",
     ctrl: true,
-    description: "Refresh Data",
-    action: checkConnection,
+    description: "Show Keyboard Shortcuts",
+    action: showShortcuts,
   },
   {
     key: "/",
@@ -385,7 +411,6 @@ async function checkConnection() {
 }
 
 function startHealthCheck() {
-  
   healthCheckInterval = window.setInterval(() => {
     checkConnection();
   }, 10000);
@@ -407,7 +432,6 @@ onMounted(async () => {
   await checkConnection();
   startHealthCheck();
 
-  
   if (!isConnected.value) {
     const config = await window.tigerBeetleApi.getConnectionConfig();
     if (!config) {

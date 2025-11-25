@@ -10,7 +10,6 @@
       </v-card-title>
 
       <v-card-text>
-        
         <div class="text-subtitle-1 mb-3">Navigation</div>
         <v-list density="compact" class="mb-4">
           <v-list-item
@@ -26,7 +25,6 @@
           </v-list-item>
         </v-list>
 
-        
         <div class="text-subtitle-1 mb-3">Actions</div>
         <v-list density="compact" class="mb-4">
           <v-list-item v-for="shortcut in actionShortcuts" :key="shortcut.key">
@@ -39,7 +37,6 @@
           </v-list-item>
         </v-list>
 
-        
         <div class="text-subtitle-1 mb-3">Views</div>
         <v-list density="compact">
           <v-list-item v-for="shortcut in viewShortcuts" :key="shortcut.key">
@@ -71,22 +68,40 @@ const navigationShortcuts: KeyboardShortcut[] = [
   { key: "1", ctrl: true, description: "Go to Dashboard", action: () => {} },
   { key: "2", ctrl: true, description: "Go to Accounts", action: () => {} },
   { key: "3", ctrl: true, description: "Go to Transfers", action: () => {} },
-  { key: "k", ctrl: true, description: "Open Search", action: () => {} },
+  {
+    key: "4",
+    ctrl: true,
+    description: "Go to Query Builder",
+    action: () => {},
+  },
+  {
+    key: "5",
+    ctrl: true,
+    description: "Go to Account History",
+    action: () => {},
+  },
 ];
 
 const actionShortcuts: KeyboardShortcut[] = [
-  { key: "n", ctrl: true, description: "New Account", action: () => {} },
-  { key: "t", ctrl: true, description: "New Transfer", action: () => {} },
   { key: "r", ctrl: true, description: "Refresh Data", action: () => {} },
-  { key: "s", ctrl: true, description: "Save", action: () => {} },
-  { key: "e", ctrl: true, description: "Export", action: () => {} },
+  { key: "f", ctrl: true, description: "Go to Search", action: () => {} },
+  {
+    key: "e",
+    ctrl: true,
+    description: "Go to Export/Backup",
+    action: () => {},
+  },
 ];
 
 const viewShortcuts: KeyboardShortcut[] = [
   { key: "d", ctrl: true, description: "Toggle Dark Mode", action: () => {} },
-  { key: "b", ctrl: true, description: "Toggle Sidebar", action: () => {} },
+  {
+    key: "k",
+    ctrl: true,
+    description: "Show Keyboard Shortcuts",
+    action: () => {},
+  },
   { key: "/", description: "Show Keyboard Shortcuts", action: () => {} },
-  { key: "Escape", description: "Close Dialog", action: () => {} },
 ];
 
 function formatShortcut(shortcut: KeyboardShortcut): string {

@@ -74,17 +74,15 @@ Display: ₿1.00000000
 
 ### Actions
 
-- `Cmd/Ctrl + N` - New Account/Transfer
 - `Cmd/Ctrl + R` - Refresh Data
-- `Cmd/Ctrl + F` - Search/Find
-- `Cmd/Ctrl + E` - Export Data
-- `Cmd/Ctrl + ,` - Settings
+- `Cmd/Ctrl + F` - Go to Search
+- `Cmd/Ctrl + E` - Go to Export/Backup
 
 ### Views
 
 - `Cmd/Ctrl + D` - Toggle Dark Mode
 - `Cmd/Ctrl + K` - Show Keyboard Shortcuts
-- `Cmd/Ctrl + B` - Toggle Sidebar
+- `/` - Show Keyboard Shortcuts (alternative)
 
 ---
 
@@ -471,8 +469,6 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 - All our [contributors](https://github.com/yourusername/tigerbeetle-studio/graphs/contributors)
 
 ---
-
-
 
 ---
 
