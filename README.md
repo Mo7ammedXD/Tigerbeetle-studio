@@ -472,12 +472,7 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 
 ---
 
-## 📞 Support
 
-- **Documentation**: [Full Documentation](./docs/)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/tigerbeetle-studio/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/tigerbeetle-studio/discussions)
-- **Email**: support@tigerbeetle-studio.com
 
 ---
 

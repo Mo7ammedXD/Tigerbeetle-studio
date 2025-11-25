@@ -20,7 +20,6 @@
       </v-alert>
 
       <v-card-text>
-        
         <v-row class="mb-4">
           <v-col cols="12" md="4">
             <v-select
@@ -54,7 +53,6 @@
           </v-col>
         </v-row>
 
-        
         <v-card variant="outlined" class="mb-4">
           <v-card-title>Parameters</v-card-title>
           <v-card-text>
@@ -197,7 +195,6 @@
           </v-card-text>
         </v-card>
 
-        
         <v-card variant="outlined">
           <v-card-title class="d-flex align-center justify-space-between">
             <span>Generated Code</span>
@@ -230,7 +227,6 @@
           </v-card-text>
         </v-card>
 
-        
         <v-divider class="my-6" />
         <div class="text-h6 mb-4">Quick Templates</div>
         <v-row>
@@ -505,7 +501,7 @@ const transferResults = await client.createTransfers(transfers);
 console.log(\`Created \${transfers.length - transferResults.length} transfers\`);`;
 
     default:
-      return "
+      return "// Select an operation to generate code";
   }
 }
 
@@ -603,16 +599,16 @@ func main() {
 }`;
 
     default:
-      return "
+      return "// Select an operation to generate code";
   }
 }
 
 function generateRust(): string {
-  return `
+  return "// Rust code generation coming soon";
 }
 
 function generateJava(): string {
-  return `
+  return "// Java code generation coming soon";
 }
 
 function copyCode() {

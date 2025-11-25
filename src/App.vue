@@ -4,17 +4,12 @@
     <v-app-bar color="surface" elevation="2" prominent>
       <template #prepend>
         <img
-          src="/logo.jpg"
+          src="/sidebar-logo.png"
           alt="TigerBeetle Logo"
-          class="ml-2 app-logo"
+          class="ml-2 app-logo rounded-lg"
           style="height: 50px; width: auto; object-fit: contain"
         />
       </template>
-
-      <v-app-bar-title class="text-h5 font-weight-bold">
-        Studio
-      </v-app-bar-title>
-
       <template #append>
         <v-chip
           :color="isConnected ? 'success' : 'error'"

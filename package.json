@@ -16,7 +16,7 @@
     "@mdi/font": "^7.4.47",
     "better-sqlite3": "^11.0.0",
     "chart.js": "^4.5.1",
-    "tigerbeetle-node": "^0.16.65",
+    "tigerbeetle-node": "0.16.65",
     "vue": "^3.4.0",
     "vuetify": "^3.10.11"
   },
