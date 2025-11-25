@@ -10,7 +10,7 @@
       </v-card-title>
 
       <v-card-text>
-        <!-- Navigation Shortcuts -->
+        
         <div class="text-subtitle-1 mb-3">Navigation</div>
         <v-list density="compact" class="mb-4">
           <v-list-item
@@ -26,7 +26,7 @@
           </v-list-item>
         </v-list>
 
-        <!-- Actions Shortcuts -->
+        
         <div class="text-subtitle-1 mb-3">Actions</div>
         <v-list density="compact" class="mb-4">
           <v-list-item v-for="shortcut in actionShortcuts" :key="shortcut.key">
@@ -39,7 +39,7 @@
           </v-list-item>
         </v-list>
 
-        <!-- View Shortcuts -->
+        
         <div class="text-subtitle-1 mb-3">Views</div>
         <v-list density="compact">
           <v-list-item v-for="shortcut in viewShortcuts" :key="shortcut.key">

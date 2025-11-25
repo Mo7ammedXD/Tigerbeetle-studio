@@ -26,7 +26,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Chart Type Selection -->
+        
         <v-row class="mb-4">
           <v-col cols="12" md="3">
             <v-select
@@ -70,9 +70,9 @@
           </v-col>
         </v-row>
 
-        <!-- Charts Grid -->
+        
         <v-row>
-          <!-- Transfer Volume Chart -->
+          
           <v-col
             cols="12"
             lg="6"
@@ -110,7 +110,7 @@
             </v-card>
           </v-col>
 
-          <!-- Account Balance Distribution -->
+          
           <v-col
             cols="12"
             lg="6"
@@ -144,7 +144,7 @@
             </v-card>
           </v-col>
 
-          <!-- Transfer Activity Heatmap -->
+          
           <v-col
             cols="12"
             lg="6"
@@ -178,7 +178,7 @@
             </v-card>
           </v-col>
 
-          <!-- Ledger Breakdown -->
+          
           <v-col
             cols="12"
             lg="6"
@@ -209,7 +209,7 @@
             </v-card>
           </v-col>
 
-          <!-- Top Accounts -->
+          
           <v-col
             cols="12"
             v-if="selectedChart === 'all' || selectedChart === 'top'"
@@ -242,7 +242,7 @@
             </v-card>
           </v-col>
 
-          <!-- Custom Metrics -->
+          
           <v-col
             cols="12"
             v-if="selectedChart === 'all' || selectedChart === 'custom'"
@@ -450,7 +450,7 @@ async function loadData() {
 }
 
 function processData(accounts: any[], transfers: any[]) {
-  // Calculate stats
+  
   const totalVolume = transfers.reduce(
     (sum, t) => sum + BigInt(t.amount || "0"),
     BigInt(0)
@@ -463,7 +463,7 @@ function processData(accounts: any[], transfers: any[]) {
   ).length;
   const negativeAccounts = accounts.length - positiveAccounts;
 
-  // Calculate peak hour
+  
   const hourCounts = new Array(24).fill(0);
   transfers.forEach((t) => {
     const timestamp = Number(BigInt(t.timestamp || "0") / 1000000n) / 1000;
@@ -472,7 +472,7 @@ function processData(accounts: any[], transfers: any[]) {
   });
   const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
 
-  // Calculate peak day
+  
   const dayCounts: Record<string, number> = {};
   const dayNames = [
     "Sunday",
@@ -493,7 +493,7 @@ function processData(accounts: any[], transfers: any[]) {
     "Monday"
   );
 
-  // Ledger breakdown
+  
   const ledgerMap: Record<string, number> = {};
   transfers.forEach((t) => {
     const ledger = t.ledger || "0";
@@ -504,7 +504,7 @@ function processData(accounts: any[], transfers: any[]) {
     count,
   }));
 
-  // Top accounts by transfer count
+  
   const accountTransferCounts: Record<string, number> = {};
   transfers.forEach((t) => {
     accountTransferCounts[t.debit_account_id] =
@@ -564,7 +564,7 @@ function renderVolumeChart(transfers: any[]) {
   const ctx = volumeChart.value.getContext("2d");
   if (!ctx) return;
 
-  // Group transfers by time period
+  
   const groupedData = groupTransfersByTime(transfers);
 
   volumeChartInstance = new Chart(ctx, {
@@ -721,7 +721,7 @@ function groupTransfersByTime(transfers: any[]) {
   const labels: string[] = [];
   const values: number[] = [];
 
-  // Simple grouping by day for last 7 days
+  
   for (let i = 6; i >= 0; i--) {
     const date = new Date(now - i * 24 * 60 * 60 * 1000);
     labels.push(
@@ -762,7 +762,7 @@ function destroyCharts() {
 }
 
 function exportChart() {
-  // Export chart as image
+  
   const canvas = volumeChart.value;
   if (canvas) {
     const url = canvas.toDataURL("image/png");

@@ -241,7 +241,7 @@ async function handleCreate() {
   success.value = "";
 
   try {
-    // Convert amount from decimal to integer (cents)
+    
     const amountInCents = parseTBAmount(formData.value.amount);
 
     const result = await window.tigerBeetleApi.createTransfer({

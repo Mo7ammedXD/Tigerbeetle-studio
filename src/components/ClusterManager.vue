@@ -38,7 +38,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Current Cluster -->
+        
         <v-card variant="outlined" color="primary" class="mb-4">
           <v-card-title>
             <v-icon icon="mdi-check-circle" class="mr-2" />
@@ -88,7 +88,7 @@
           </v-card-text>
         </v-card>
 
-        <!-- Saved Clusters -->
+        
         <div class="text-h6 mb-4">Saved Clusters</div>
         <v-row v-if="clusters.length > 0">
           <v-col v-for="cluster in clusters" :key="cluster.id" cols="12" md="6">
@@ -165,7 +165,7 @@
           No saved clusters. Add your first cluster to get started.
         </v-alert>
 
-        <!-- Cluster Comparison -->
+        
         <v-divider class="my-6" />
         <div class="text-h6 mb-4">Cluster Comparison</div>
         <v-card variant="outlined">
@@ -222,7 +222,7 @@
       </v-card-text>
     </v-card>
 
-    <!-- Add/Edit Cluster Dialog -->
+    
     <v-dialog v-model="showAddDialog" max-width="600" persistent>
       <v-card>
         <v-card-title>
@@ -481,7 +481,7 @@ function saveToLocalStorage() {
 }
 
 onMounted(async () => {
-  // Load saved clusters
+  
   const saved = localStorage.getItem("tigerbeetle_clusters");
   if (saved) {
     try {
@@ -490,7 +490,7 @@ onMounted(async () => {
     }
   }
 
-  // Load current cluster
+  
   const current = localStorage.getItem("tigerbeetle_current_cluster");
   if (current) {
     try {
@@ -499,7 +499,7 @@ onMounted(async () => {
     }
   }
 
-  // Try to get current connection config
+  
   try {
     const config = await window.tigerBeetleApi.getConnectionConfig();
     if (config) {
@@ -509,7 +509,7 @@ onMounted(async () => {
       if (existing) {
         currentCluster.value = existing;
       } else {
-        // Add current connection as a cluster
+        
         const newCluster: Cluster = {
           id: `cluster_${Date.now()}`,
           name: "Current Connection",

@@ -20,7 +20,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Configuration -->
+        
         <v-row class="mb-4">
           <v-col cols="12" md="4">
             <v-select
@@ -54,7 +54,7 @@
           </v-col>
         </v-row>
 
-        <!-- Operation Parameters -->
+        
         <v-card variant="outlined" class="mb-4">
           <v-card-title>Parameters</v-card-title>
           <v-card-text>
@@ -197,7 +197,7 @@
           </v-card-text>
         </v-card>
 
-        <!-- Generated Code -->
+        
         <v-card variant="outlined">
           <v-card-title class="d-flex align-center justify-space-between">
             <span>Generated Code</span>
@@ -230,7 +230,7 @@
           </v-card-text>
         </v-card>
 
-        <!-- Code Templates -->
+        
         <v-divider class="my-6" />
         <div class="text-h6 mb-4">Quick Templates</div>
         <v-row>
@@ -390,13 +390,13 @@ const client = createClient({
     .join(", ")}]
 });
 
-// Use the client
+
 console.log('Connected to TigerBeetle');`;
 
     case "createAccount":
       return `import { createClient, Account } from 'tigerbeetle-node';
 
-const client = createClient({ /* config */ });
+const client = createClient({ });
 
 const account: Account = {
   id: ${params.value.accountId || "generateId()"},
@@ -424,7 +424,7 @@ if (result.length === 0) {
     case "createTransfer":
       return `import { createClient, Transfer } from 'tigerbeetle-node';
 
-const client = createClient({ /* config */ });
+const client = createClient({ });
 
 const transfer: Transfer = {
   id: generateId(),
@@ -455,7 +455,7 @@ if (result.length === 0) {
         .filter((id) => id.trim());
       return `import { createClient } from 'tigerbeetle-node';
 
-const client = createClient({ /* config */ });
+const client = createClient({ });
 
 const accountIds = [${accountIds.map((id) => id.trim()).join(", ")}];
 const accounts = await client.lookupAccounts(accountIds);
@@ -471,7 +471,7 @@ accounts.forEach(account => {
         .filter((id) => id.trim());
       return `import { createClient } from 'tigerbeetle-node';
 
-const client = createClient({ /* config */ });
+const client = createClient({ });
 
 const transferIds = [${transferIds.map((id) => id.trim()).join(", ")}];
 const transfers = await client.lookupTransfers(transferIds);
@@ -484,28 +484,28 @@ transfers.forEach(transfer => {
     case "batch":
       return `import { createClient, Account, Transfer } from 'tigerbeetle-node';
 
-const client = createClient({ /* config */ });
+const client = createClient({ });
 
-// Create multiple accounts
+
 const accounts: Account[] = [
-  { id: 1n, ledger: 1, code: 1, /* ... */ },
-  { id: 2n, ledger: 1, code: 1, /* ... */ }
+  { id: 1n, ledger: 1, code: 1, },
+  { id: 2n, ledger: 1, code: 1, }
 ];
 
 const accountResults = await client.createAccounts(accounts);
 console.log(\`Created \${accounts.length - accountResults.length} accounts\`);
 
-// Create multiple transfers
+
 const transfers: Transfer[] = [
-  { id: 1n, debit_account_id: 1n, credit_account_id: 2n, amount: 1000n, /* ... */ },
-  { id: 2n, debit_account_id: 2n, credit_account_id: 1n, amount: 500n, /* ... */ }
+  { id: 1n, debit_account_id: 1n, credit_account_id: 2n, amount: 1000n, },
+  { id: 2n, debit_account_id: 2n, credit_account_id: 1n, amount: 500n, }
 ];
 
 const transferResults = await client.createTransfers(transfers);
 console.log(\`Created \${transfers.length - transferResults.length} transfers\`);`;
 
     default:
-      return "// Select an operation to generate code";
+      return "
   }
 }
 
@@ -603,16 +603,16 @@ func main() {
 }`;
 
     default:
-      return "// Select an operation to generate code";
+      return "
   }
 }
 
 function generateRust(): string {
-  return `// Rust code generation coming soon`;
+  return `
 }
 
 function generateJava(): string {
-  return `// Java code generation coming soon`;
+  return `
 }
 
 function copyCode() {

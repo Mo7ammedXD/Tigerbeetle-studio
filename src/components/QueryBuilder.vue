@@ -211,7 +211,7 @@
           </v-expansion-panel>
         </v-expansion-panels>
 
-        <!-- Action Buttons -->
+        
         <v-card-actions class="px-0 pt-4">
           <v-btn
             color="primary"
@@ -266,7 +266,7 @@
           </v-menu>
         </v-card-actions>
 
-        <!-- Results -->
+        
         <v-divider class="my-4" />
 
         <div v-if="results.length > 0">
@@ -331,7 +331,7 @@
       </v-card-text>
     </v-card>
 
-    <!-- Saved Queries Dialog -->
+    
     <v-dialog v-model="showSavedQueries" max-width="600">
       <v-card>
         <v-card-title>Saved Queries</v-card-title>
@@ -501,7 +501,7 @@ async function executeQuery() {
       }
     }
 
-    // Apply filters
+    
     results.value = applyFilters(data);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Query execution failed";
@@ -513,22 +513,22 @@ async function executeQuery() {
 function applyFilters(data: any[]): any[] {
   let filtered = [...data];
 
-  // Filter by ledger
+  
   if (query.value.ledger !== null) {
     filtered = filtered.filter((item) => item.ledger === query.value.ledger);
   }
 
-  // Filter by code
+  
   if (query.value.code !== null) {
     filtered = filtered.filter((item) => item.code === query.value.code);
   }
 
-  // Filter by account ID
+  
   if (query.value.accountId) {
     filtered = filtered.filter((item) => item.id === query.value.accountId);
   }
 
-  // Filter by search text (alias)
+  
   if (query.value.searchText) {
     const searchLower = query.value.searchText.toLowerCase();
     filtered = filtered.filter(
@@ -539,7 +539,7 @@ function applyFilters(data: any[]): any[] {
     );
   }
 
-  // Filter by date range
+  
   if (query.value.dateFrom) {
     const fromTime = new Date(query.value.dateFrom).getTime() / 1000;
     filtered = filtered.filter((item) => {
@@ -556,7 +556,7 @@ function applyFilters(data: any[]): any[] {
     });
   }
 
-  // Filter by balance (accounts only)
+  
   if (query.value.entity === "Accounts") {
     if (query.value.minBalance) {
       const minBalanceCents = parseTBAmount(query.value.minBalance);
@@ -573,7 +573,7 @@ function applyFilters(data: any[]): any[] {
     }
   }
 
-  // Filter by amount (transfers only)
+  
   if (query.value.entity === "Transfers") {
     if (query.value.minAmount) {
       const minAmountCents = parseTBAmount(query.value.minAmount);
@@ -590,7 +590,7 @@ function applyFilters(data: any[]): any[] {
     }
   }
 
-  // Apply sorting
+  
   filtered = applySorting(filtered);
 
   return filtered;
@@ -741,7 +741,7 @@ function getBalanceColor(balance: string): string {
 }
 
 onMounted(() => {
-  // Load saved queries from localStorage
+  
   const saved = localStorage.getItem("tigerbeetle_saved_queries");
   if (saved) {
     try {

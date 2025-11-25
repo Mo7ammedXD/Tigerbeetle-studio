@@ -20,7 +20,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Account Selector -->
+        
         <v-row>
           <v-col cols="12" md="8">
             <v-autocomplete
@@ -62,7 +62,7 @@
           </v-col>
         </v-row>
 
-        <!-- Account Summary -->
+        
         <v-card v-if="selectedAccount" variant="outlined" class="mb-4">
           <v-card-text>
             <v-row>
@@ -111,7 +111,7 @@
           </v-card-text>
         </v-card>
 
-        <!-- Transaction Timeline -->
+        
         <div v-if="loading" class="text-center py-8">
           <v-progress-circular indeterminate color="primary" />
           <div class="mt-4">Loading transaction history...</div>
@@ -330,7 +330,7 @@ async function loadHistory() {
   history.value = [];
 
   try {
-    // Get account details
+    
     const accountResult = await window.tigerBeetleApi.getAccounts(1000, 0);
     if (accountResult.success) {
       const data = accountResult.data;
@@ -340,7 +340,7 @@ async function loadHistory() {
         accountsData.find((a: any) => a.id === selectedAccountId.value) || null;
     }
 
-    // Get all transfers
+    
     const transfersResult = await window.tigerBeetleApi.getTransfers(1000, 0);
     if (!transfersResult.success) {
       error.value = transfersResult.error || "Failed to load transfers";
@@ -351,24 +351,24 @@ async function loadHistory() {
     const transfers =
       data && "data" in data ? data.data : (data as any[]) || [];
 
-    // Filter transfers involving this account
+    
     const relevantTransfers = transfers.filter(
       (t: TBTransfer) =>
         t.debit_account_id === selectedAccountId.value ||
         t.credit_account_id === selectedAccountId.value
     );
 
-    // Apply time range filter
+    
     const filteredTransfers = applyTimeRangeFilter(relevantTransfers);
 
-    // Sort by timestamp (oldest first for running balance calculation)
+    
     filteredTransfers.sort((a: any, b: any) => {
       const aTime = Number(BigInt(a.timestamp || "0") / 1000000n);
       const bTime = Number(BigInt(b.timestamp || "0") / 1000000n);
       return aTime - bTime;
     });
 
-    // Build transaction history with running balance
+    
     let runningBalance = BigInt(0);
     const transactions: Transaction[] = [];
 
@@ -407,7 +407,7 @@ async function loadHistory() {
       }
     }
 
-    // Reverse to show newest first
+    
     history.value = transactions.reverse();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load history";

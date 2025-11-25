@@ -33,7 +33,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Controls -->
+        
         <v-row class="mb-4">
           <v-col cols="12" md="3">
             <v-select
@@ -81,7 +81,7 @@
           </v-col>
         </v-row>
 
-        <!-- Visualization Canvas -->
+        
         <v-card variant="outlined" class="mb-4">
           <div ref="canvasContainer" class="flow-canvas-container">
             <canvas
@@ -94,7 +94,7 @@
           </div>
         </v-card>
 
-        <!-- Legend and Stats -->
+        
         <v-row>
           <v-col cols="12" md="6">
             <v-card variant="outlined">
@@ -167,7 +167,7 @@
           </v-col>
         </v-row>
 
-        <!-- Selected Node Details -->
+        
         <v-card v-if="selectedNode" variant="outlined" class="mt-4">
           <v-card-title>Account Details</v-card-title>
           <v-card-text>
@@ -213,7 +213,7 @@
           </v-card-text>
         </v-card>
 
-        <!-- Controls Help -->
+        
         <v-alert type="info" variant="tonal" class="mt-4">
           <div class="text-subtitle-2 mb-2">Controls</div>
           <ul class="text-body-2">
@@ -285,7 +285,7 @@ const flowTypes = [
   { title: "Circular Flows", value: "circular" },
 ];
 
-// Canvas state
+
 let ctx: CanvasRenderingContext2D | null = null;
 let scale = 1;
 let offsetX = 0;
@@ -373,7 +373,7 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
   const nodeMap = new Map<string, FlowNode>();
   const edgeList: FlowEdge[] = [];
 
-  // Filter transfers
+  
   let filteredTransfers = transfers;
   if (focusAccount.value) {
     filteredTransfers = transfers.filter(
@@ -391,12 +391,12 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
     );
   }
 
-  // Build nodes and edges
+  
   filteredTransfers.forEach((transfer) => {
     const debitId = transfer.debit_account_id;
     const creditId = transfer.credit_account_id;
 
-    // Add nodes
+    
     if (!nodeMap.has(debitId)) {
       const account = accountMap.get(debitId);
       nodeMap.set(debitId, {
@@ -427,7 +427,7 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
       });
     }
 
-    // Update counts
+    
     const debitNode = nodeMap.get(debitId)!;
     const creditNode = nodeMap.get(creditId)!;
     debitNode.outgoingCount++;
@@ -439,7 +439,7 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
       BigInt(creditNode.totalVolume) + amount
     ).toString();
 
-    // Add edge
+    
     edgeList.push({
       from: debitId,
       to: creditId,
@@ -448,7 +448,7 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
     });
   });
 
-  // Classify node types
+  
   nodeMap.forEach((node) => {
     if (node.outgoingCount > 0 && node.incomingCount === 0) {
       node.type = "source";
@@ -457,14 +457,14 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
     }
   });
 
-  // Layout nodes in a force-directed manner (simplified)
+  
   const nodeList = Array.from(nodeMap.values());
   layoutNodes(nodeList);
 
   nodes.value = nodeList;
   edges.value = edgeList;
 
-  // Calculate stats
+  
   const totalFlow = edgeList.reduce(
     (sum, e) => sum + BigInt(e.amount),
     BigInt(0)
@@ -486,7 +486,7 @@ function layoutNodes(nodeList: FlowNode[]) {
   const centerY = height / 2;
   const radius = Math.min(width, height) / 3;
 
-  // Simple circular layout
+  
   nodeList.forEach((node, index) => {
     const angle = (index / nodeList.length) * 2 * Math.PI;
     node.x = centerX + radius * Math.cos(angle);
@@ -500,15 +500,15 @@ function renderFlow() {
   const width = flowCanvas.value.width;
   const height = flowCanvas.value.height;
 
-  // Clear canvas
+  
   ctx.clearRect(0, 0, width, height);
 
-  // Apply transformations
+  
   ctx.save();
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 
-  // Draw edges
+  
   edges.value.forEach((edge) => {
     const fromNode = nodes.value.find((n) => n.id === edge.from);
     const toNode = nodes.value.find((n) => n.id === edge.to);
@@ -524,12 +524,12 @@ function renderFlow() {
       ctx.lineWidth = lineWidth;
       ctx.stroke();
 
-      // Draw arrow
+      
       drawArrow(ctx, fromNode.x, fromNode.y, toNode.x, toNode.y);
     }
   });
 
-  // Draw nodes
+  
   nodes.value.forEach((node) => {
     const color = getNodeColor(node.type);
     const radius = 20;
@@ -542,7 +542,7 @@ function renderFlow() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Draw label
+    
     ctx.fillStyle = "#000";
     ctx.font = "12px sans-serif";
     ctx.textAlign = "center";
@@ -592,7 +592,7 @@ function handleMouseDown(event: MouseEvent) {
   lastMouseX = event.clientX;
   lastMouseY = event.clientY;
 
-  // Check if clicked on a node
+  
   const rect = flowCanvas.value?.getBoundingClientRect();
   if (rect) {
     const x = (event.clientX - rect.left - offsetX) / scale;

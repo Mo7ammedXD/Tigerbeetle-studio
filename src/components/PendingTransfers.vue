@@ -40,7 +40,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Info Alert -->
+        
         <v-alert type="info" variant="tonal" class="mb-4">
           <div class="text-subtitle-2 mb-2">About Pending Transfers</div>
           <div class="text-body-2">
@@ -51,7 +51,7 @@
           </div>
         </v-alert>
 
-        <!-- Filters -->
+        
         <v-row class="mb-4">
           <v-col cols="12" md="4">
             <v-select
@@ -85,7 +85,7 @@
           </v-col>
         </v-row>
 
-        <!-- Pending Transfers Table -->
+        
         <v-data-table
           v-if="filteredTransfers.length > 0"
           :headers="headers"
@@ -210,7 +210,7 @@
           No pending transfers found.
         </v-alert>
 
-        <!-- Bulk Actions -->
+        
         <v-card
           v-if="pendingTransfers.length > 0"
           variant="outlined"
@@ -315,14 +315,14 @@ const headers = [
 const filteredTransfers = computed(() => {
   let filtered = [...pendingTransfers.value];
 
-  // Status filter
+  
   if (filter.value.status === "pending") {
     filtered = filtered.filter((t) => t.flags?.includes("pending"));
   } else if (filter.value.status === "posted") {
     filtered = filtered.filter((t) => !t.flags?.includes("pending"));
   }
 
-  // Timeout filter
+  
   if (filter.value.timeoutStatus) {
     const now = Date.now() / 1000;
     filtered = filtered.filter((t) => {
@@ -332,7 +332,7 @@ const filteredTransfers = computed(() => {
       const timeLeft = expiresAt - now;
 
       if (filter.value.timeoutStatus === "expiring") {
-        return timeLeft > 0 && timeLeft < 3600; // < 1 hour
+        return timeLeft > 0 && timeLeft < 3600; 
       } else if (filter.value.timeoutStatus === "expired") {
         return timeLeft <= 0;
       } else if (filter.value.timeoutStatus === "active") {
@@ -342,7 +342,7 @@ const filteredTransfers = computed(() => {
     });
   }
 
-  // Search filter
+  
   if (filter.value.searchText) {
     const search = filter.value.searchText.toLowerCase();
     filtered = filtered.filter(
@@ -385,7 +385,7 @@ async function loadPendingTransfers() {
       const transfers =
         data && "data" in data ? data.data : (data as any[]) || [];
 
-      // Filter for pending transfers
+      
       pendingTransfers.value = transfers.map((t: any) => ({
         ...t,
         isPending: t.flags?.includes("pending") || false,
@@ -416,7 +416,7 @@ async function postTransfer(transfer: any) {
   error.value = null;
 
   try {
-    // Create a new transfer with post_pending_transfer flag
+    
     const result = await window.tigerBeetleApi.createTransfer({
       pending_id: transfer.id,
       debit_account_id: transfer.debit_account_id,
@@ -424,7 +424,7 @@ async function postTransfer(transfer: any) {
       amount: transfer.amount,
       ledger: transfer.ledger,
       code: transfer.code,
-      flags: 4, // post_pending_transfer flag
+      flags: 4, 
     });
 
     if (result.success) {
@@ -457,15 +457,15 @@ async function voidTransfer(transfer: any) {
   error.value = null;
 
   try {
-    // Create a new transfer with void_pending_transfer flag
+    
     const result = await window.tigerBeetleApi.createTransfer({
       pending_id: transfer.id,
       debit_account_id: transfer.debit_account_id,
       credit_account_id: transfer.credit_account_id,
-      amount: "0", // Zero amount for void
+      amount: "0", 
       ledger: transfer.ledger,
       code: transfer.code,
-      flags: 8, // void_pending_transfer flag
+      flags: 8, 
     });
 
     if (result.success) {

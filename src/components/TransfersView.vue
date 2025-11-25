@@ -263,7 +263,7 @@ async function loadTransfers() {
 
     if (result.success) {
       const data = result.data;
-      // Handle both paginated and non-paginated responses
+      
       if (data && typeof data === "object" && "data" in data) {
         transfers.value = data.data || [];
         totalItems.value = data.total || 0;
@@ -325,12 +325,12 @@ function handleTransferCreated() {
   emit("refresh");
 }
 
-// Watch for connection status changes
+
 watch(
   () => props.isConnected,
   (newValue: boolean, oldValue: boolean) => {
     if (newValue && !oldValue) {
-      // Connection just established, reload data
+      
       loadTransfers();
     }
   }
@@ -340,7 +340,7 @@ onMounted(() => {
   loadTransfers();
 });
 
-// Reload data when component becomes active (tab switching)
+
 onActivated(() => {
   if (props.isConnected) {
     loadTransfers();

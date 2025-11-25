@@ -234,7 +234,7 @@
       </v-card-text>
     </v-card>
 
-    <!-- Create Account Modal -->
+    
     <CreateAccountModal
       v-model="showCreateModal"
       @created="handleAccountCreated"
@@ -305,7 +305,7 @@ async function loadAccounts() {
 
     if (result.success) {
       const data = result.data;
-      // Handle both paginated and non-paginated responses
+      
       if (data && typeof data === "object" && "data" in data) {
         accounts.value = data.data || [];
         totalItems.value = data.total || 0;
@@ -370,7 +370,7 @@ function getBalanceColor(balance: string): string {
 }
 
 function showAccountDetails(account: any) {
-  // Toggle expansion
+  
   const index = expanded.value.indexOf(account.id);
   if (index > -1) {
     expanded.value.splice(index, 1);
@@ -389,7 +389,7 @@ watch(
   () => props.isConnected,
   (newValue: boolean, oldValue: boolean) => {
     if (newValue && !oldValue) {
-      // Connection just established, reload data
+      
       loadAccounts();
     }
   }

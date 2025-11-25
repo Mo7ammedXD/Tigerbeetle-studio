@@ -43,7 +43,7 @@
         </v-tabs>
 
         <v-window v-model="tab" class="mt-4">
-          <!-- Bulk Accounts -->
+          
           <v-window-item value="accounts">
             <v-card variant="outlined">
               <v-card-text>
@@ -129,7 +129,7 @@
                   </v-card-actions>
                 </div>
 
-                <!-- Progress -->
+                
                 <v-card v-if="processing" variant="outlined" class="mt-4">
                   <v-card-text>
                     <div class="text-subtitle-2 mb-2">Processing...</div>
@@ -148,7 +148,7 @@
                   </v-card-text>
                 </v-card>
 
-                <!-- Results -->
+                
                 <v-card
                   v-if="results.length > 0"
                   variant="outlined"
@@ -188,7 +188,7 @@
             </v-card>
           </v-window-item>
 
-          <!-- Bulk Transfers -->
+          
           <v-window-item value="transfers">
             <v-card variant="outlined">
               <v-card-text>
@@ -277,7 +277,7 @@
                   </v-card-actions>
                 </div>
 
-                <!-- Progress and Results (same as accounts) -->
+                
                 <v-card v-if="processing" variant="outlined" class="mt-4">
                   <v-card-text>
                     <div class="text-subtitle-2 mb-2">Processing...</div>
@@ -428,7 +428,7 @@ function parseAccountsCSV() {
         account[header] = values[i] || "";
       });
 
-      // Validate
+      
       const errors: string[] = [];
       if (!account.alias) errors.push("Missing alias");
       if (!account.ledger || isNaN(Number(account.ledger)))
@@ -470,7 +470,7 @@ function parseTransfersCSV() {
         transfer[header] = values[i] || "";
       });
 
-      // Validate
+      
       const errors: string[] = [];
       if (
         !transfer.debit_account_id ||
@@ -497,7 +497,7 @@ function parseTransfersCSV() {
       transfer.ledger = Number(transfer.ledger);
       transfer.code = Number(transfer.code);
 
-      // Convert amount to cents
+      
       if (transfer.status === "valid") {
         transfer.amount = parseTBAmount(transfer.amount);
       }

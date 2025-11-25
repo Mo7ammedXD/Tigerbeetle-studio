@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <!-- App Bar -->
+    
     <v-app-bar color="surface" elevation="2" prominent>
       <template #prepend>
         <img
@@ -50,7 +50,7 @@
       </template>
     </v-app-bar>
 
-    <!-- Navigation Drawer -->
+    
     <v-navigation-drawer permanent width="280">
       <v-list density="compact" nav>
         <v-list-subheader>OVERVIEW</v-list-subheader>
@@ -189,7 +189,7 @@
       </v-list>
     </v-navigation-drawer>
 
-    <!-- Main Content -->
+    
     <v-main>
       <v-container fluid class="pa-6">
         <Dashboard
@@ -261,13 +261,13 @@
       </v-container>
     </v-main>
 
-    <!-- Connection Modal -->
+    
     <ConnectionModal
       v-model="showConnectionModal"
       @connected="handleConnected"
     />
 
-    <!-- Keyboard Shortcuts Dialog -->
+    
     <KeyboardShortcutsDialog ref="shortcutsDialog" />
   </v-app>
 </template>
@@ -321,7 +321,7 @@ const shortcutsDialog = ref<InstanceType<typeof KeyboardShortcutsDialog>>();
 const theme = useTheme();
 let healthCheckInterval: number | null = null;
 
-// Load dark mode preference
+
 const savedDarkMode = localStorage.getItem("tigerbeetle_dark_mode");
 if (savedDarkMode) {
   darkMode.value = savedDarkMode === "true";
@@ -338,7 +338,7 @@ function showShortcuts() {
   shortcutsDialog.value?.show();
 }
 
-// Keyboard shortcuts
+
 useKeyboardShortcuts([
   {
     key: "1",
@@ -390,7 +390,7 @@ async function checkConnection() {
 }
 
 function startHealthCheck() {
-  // Check connection every 10 seconds
+  
   healthCheckInterval = window.setInterval(() => {
     checkConnection();
   }, 10000);
@@ -412,7 +412,7 @@ onMounted(async () => {
   await checkConnection();
   startHealthCheck();
 
-  // Auto-show connection modal if not connected
+  
   if (!isConnected.value) {
     const config = await window.tigerBeetleApi.getConnectionConfig();
     if (!config) {

@@ -32,7 +32,7 @@
 
       <v-card-text>
         <v-row>
-          <!-- Export Section -->
+          
           <v-col cols="12" md="6">
             <v-card variant="outlined">
               <v-card-title class="bg-primary">
@@ -93,7 +93,7 @@
             </v-card>
           </v-col>
 
-          <!-- Backup Section -->
+          
           <v-col cols="12" md="6">
             <v-card variant="outlined">
               <v-card-title class="bg-success">
@@ -155,7 +155,7 @@
             </v-card>
           </v-col>
 
-          <!-- Import/Restore Section -->
+          
           <v-col cols="12">
             <v-card variant="outlined">
               <v-card-title class="bg-warning">
@@ -211,7 +211,7 @@
             </v-card>
           </v-col>
 
-          <!-- Backup History -->
+          
           <v-col cols="12">
             <v-card variant="outlined">
               <v-card-title>
@@ -253,7 +253,7 @@
       </v-card-text>
     </v-card>
 
-    <!-- Progress Dialog -->
+    
     <v-dialog v-model="showProgress" persistent max-width="500">
       <v-card>
         <v-card-title>{{ progressTitle }}</v-card-title>
@@ -342,7 +342,7 @@ async function executeExport() {
   try {
     let data: any = {};
 
-    // Fetch accounts
+    
     if (exportOptions.value.entity !== "Transfers Only") {
       progressMessage.value = "Fetching accounts...";
       progress.value = 25;
@@ -357,7 +357,7 @@ async function executeExport() {
       }
     }
 
-    // Fetch transfers
+    
     if (exportOptions.value.entity !== "Accounts Only") {
       progressMessage.value = "Fetching transfers...";
       progress.value = 50;
@@ -375,7 +375,7 @@ async function executeExport() {
       }
     }
 
-    // Add metadata
+    
     if (exportOptions.value.includeMetadata) {
       data.metadata = {
         exportDate: new Date().toISOString(),
@@ -387,7 +387,7 @@ async function executeExport() {
     progressMessage.value = "Generating export file...";
     progress.value = 75;
 
-    // Generate export file
+    
     let content = "";
     let filename = "";
     let mimeType = "";
@@ -397,7 +397,7 @@ async function executeExport() {
       filename = `tigerbeetle_export_${Date.now()}.json`;
       mimeType = "application/json";
     } else if (exportOptions.value.format === "CSV") {
-      // Generate CSV for accounts and transfers separately
+      
       content = generateCSV(data);
       filename = `tigerbeetle_export_${Date.now()}.csv`;
       mimeType = "text/csv";
@@ -410,7 +410,7 @@ async function executeExport() {
     progress.value = 100;
     progressMessage.value = "Download starting...";
 
-    // Download file
+    
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -452,7 +452,7 @@ async function createBackup() {
       version: "1.0",
     };
 
-    // Fetch all data
+    
     progressMessage.value = "Fetching accounts...";
     progress.value = 20;
     const accountsResult = await window.tigerBeetleApi.getAccounts(10000, 0);
@@ -489,7 +489,7 @@ async function createBackup() {
     let filename = `${backup.name}.json`;
 
     if (backupOptions.value.encrypt) {
-      // Simple encryption placeholder (in production, use proper encryption)
+      
       content = btoa(content);
       filename = `${backup.name}.encrypted.json`;
     }
@@ -497,7 +497,7 @@ async function createBackup() {
     progress.value = 100;
     progressMessage.value = "Download starting...";
 
-    // Download backup
+    
     const blob = new Blob([content], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -506,7 +506,7 @@ async function createBackup() {
     a.click();
     URL.revokeObjectURL(url);
 
-    // Add to history
+    
     backupHistory.value.unshift({
       name: backup.name,
       date: new Date().toLocaleString(),
@@ -516,7 +516,7 @@ async function createBackup() {
       filename,
     });
 
-    // Save history to localStorage
+    
     localStorage.setItem(
       "tigerbeetle_backup_history",
       JSON.stringify(backupHistory.value.slice(0, 10))
@@ -552,7 +552,7 @@ async function executeImport() {
       try {
         let content = e.target?.result as string;
 
-        // Decrypt if needed
+        
         if (isEncrypted.value) {
           if (!importPassword.value) {
             error.value = "Password required for encrypted backup";
@@ -567,24 +567,24 @@ async function executeImport() {
         progress.value = 20;
 
         if (importOptions.value.dryRun) {
-          // Validation only
+          
           const accountsCount = data.accounts?.length || 0;
           const transfersCount = data.transfers?.length || 0;
           success.value = `Validation successful: ${accountsCount} accounts, ${transfersCount} transfers`;
           progress.value = 100;
         } else {
-          // Import accounts
+          
           if (data.accounts) {
             progressMessage.value = `Importing ${data.accounts.length} accounts...`;
             progress.value = 40;
-            // Import logic here (would need bulk import API)
+            
           }
 
-          // Import transfers
+          
           if (data.transfers) {
             progressMessage.value = `Importing ${data.transfers.length} transfers...`;
             progress.value = 70;
-            // Import logic here
+            
           }
 
           progress.value = 100;
@@ -651,7 +651,7 @@ function generateSQL(data: any): string {
 }
 
 function downloadBackup(backup: any) {
-  // Placeholder - would need to store backups somewhere
+  
 }
 
 function formatBytes(bytes: number): string {
@@ -662,7 +662,7 @@ function formatBytes(bytes: number): string {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
-// Load backup history on mount
+
 const savedHistory = localStorage.getItem("tigerbeetle_backup_history");
 if (savedHistory) {
   try {

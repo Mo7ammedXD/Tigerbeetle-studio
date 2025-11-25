@@ -38,7 +38,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Ledgers List -->
+        
         <v-row v-if="ledgers.length > 0">
           <v-col v-for="ledger in ledgers" :key="ledger.id" cols="12" md="6">
             <v-card variant="outlined">
@@ -77,7 +77,7 @@
                   </v-col>
                 </v-row>
 
-                <!-- Account Codes -->
+                
                 <v-divider class="my-3" />
                 <div class="text-subtitle-2 mb-2">Account Codes</div>
                 <v-chip
@@ -98,7 +98,7 @@
                   No account codes defined
                 </div>
 
-                <!-- Transfer Codes -->
+                
                 <v-divider class="my-3" />
                 <div class="text-subtitle-2 mb-2">Transfer Codes</div>
                 <v-chip
@@ -145,7 +145,7 @@
           No ledgers configured. Add your first ledger to get started.
         </v-alert>
 
-        <!-- Global Currency Settings -->
+        
         <v-divider class="my-6" />
         <div class="text-h6 mb-4">Global Currency Settings</div>
         <v-card variant="outlined">
@@ -186,7 +186,7 @@
       </v-card-text>
     </v-card>
 
-    <!-- Add/Edit Ledger Dialog -->
+    
     <v-dialog v-model="showAddDialog" max-width="800" persistent scrollable>
       <v-card>
         <v-card-title>
@@ -227,7 +227,7 @@
                 />
               </v-col>
 
-              <!-- Currency Settings -->
+              
               <v-col cols="12">
                 <div class="text-subtitle-1 mb-2">Currency Settings</div>
               </v-col>
@@ -291,7 +291,7 @@
                 />
               </v-col>
 
-              <!-- Account Codes -->
+              
               <v-col cols="12">
                 <v-divider class="my-2" />
                 <div class="text-subtitle-1 mb-2">Account Codes</div>
@@ -346,7 +346,7 @@
                 </v-btn>
               </v-col>
 
-              <!-- Transfer Codes -->
+              
               <v-col cols="12">
                 <v-divider class="my-2" />
                 <div class="text-subtitle-1 mb-2">Transfer Codes</div>
@@ -501,11 +501,11 @@ function saveLedger() {
       success.value = "Ledger added";
     }
 
-    // Save to config store
+    
     setLedgerConfig(ledger.id, ledger);
     saveToLocalStorage();
 
-    // Update currency composable
+    
     updateLedgerConfigs(ledgers.value);
 
     closeDialog();
@@ -598,12 +598,12 @@ function saveToLocalStorage() {
     JSON.stringify(ledgers.value)
   );
 
-  // Update currency composable
+  
   updateLedgerConfigs(ledgers.value);
 }
 
 onMounted(() => {
-  // Load saved ledgers
+  
   const saved = localStorage.getItem("tigerbeetle_ledger_configs");
   if (saved) {
     try {
@@ -612,7 +612,7 @@ onMounted(() => {
     }
   }
 
-  // Load global currency
+  
   globalCurrency.value = globalCurrencyRef.value.code;
 });
 </script>

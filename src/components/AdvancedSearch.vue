@@ -20,7 +20,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Search Input -->
+        
         <v-text-field
           v-model="searchQuery"
           label="Search across all data"
@@ -40,7 +40,7 @@
           </template>
         </v-text-field>
 
-        <!-- Advanced Options -->
+        
         <v-expansion-panels v-model="panels" multiple class="mb-4">
           <v-expansion-panel value="options">
             <v-expansion-panel-title>
@@ -131,7 +131,7 @@
           </v-expansion-panel>
         </v-expansion-panels>
 
-        <!-- Results Tabs -->
+        
         <v-tabs
           v-if="hasResults"
           v-model="activeTab"
@@ -147,9 +147,9 @@
           </v-tab>
         </v-tabs>
 
-        <!-- Results Content -->
+        
         <v-window v-if="hasResults" v-model="activeTab">
-          <!-- All Results -->
+          
           <v-window-item value="all">
             <div class="mb-4">
               <v-chip color="success" class="mr-2">
@@ -160,7 +160,7 @@
               </v-chip>
             </div>
 
-            <!-- Account Results -->
+            
             <div v-if="accountResults.length > 0" class="mb-4">
               <div class="text-subtitle-1 mb-2">Accounts</div>
               <v-list>
@@ -187,7 +187,7 @@
               </v-btn>
             </div>
 
-            <!-- Transfer Results -->
+            
             <div v-if="transferResults.length > 0">
               <div class="text-subtitle-1 mb-2">Transfers</div>
               <v-list>
@@ -225,7 +225,7 @@
             </div>
           </v-window-item>
 
-          <!-- Accounts Tab -->
+          
           <v-window-item value="accounts">
             <v-data-table
               :headers="accountHeaders"
@@ -251,7 +251,7 @@
             </v-data-table>
           </v-window-item>
 
-          <!-- Transfers Tab -->
+          
           <v-window-item value="transfers">
             <v-data-table
               :headers="transferHeaders"
@@ -281,12 +281,12 @@
           </v-window-item>
         </v-window>
 
-        <!-- No Results -->
+        
         <v-alert v-else-if="searched && !searching" type="info" variant="tonal">
           No results found for "{{ searchQuery }}"
         </v-alert>
 
-        <!-- Quick Search Tips -->
+        
         <v-card v-if="!searched" variant="outlined" class="mt-4">
           <v-card-title>Search Tips</v-card-title>
           <v-card-text>
@@ -386,7 +386,7 @@ async function executeSearch() {
   transferResults.value = [];
 
   try {
-    // Fetch all data
+    
     const [accountsResult, transfersResult] = await Promise.all([
       options.value.searchAccounts
         ? window.tigerBeetleApi.getAccounts(10000, 0)
@@ -396,7 +396,7 @@ async function executeSearch() {
         : Promise.resolve({ success: true, data: [] }),
     ]);
 
-    // Process accounts
+    
     if (accountsResult.success && options.value.searchAccounts) {
       const data = accountsResult.data;
       const accounts =
@@ -404,7 +404,7 @@ async function executeSearch() {
       accountResults.value = searchInAccounts(accounts);
     }
 
-    // Process transfers
+    
     if (transfersResult.success && options.value.searchTransfers) {
       const data = transfersResult.data;
       const transfers =
@@ -412,7 +412,7 @@ async function executeSearch() {
       transferResults.value = searchInTransfers(transfers);
     }
 
-    // Add to history
+    
     addToHistory({
       query: searchQuery.value,
       results: totalResults.value,

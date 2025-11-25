@@ -1,7 +1,7 @@
 <template>
   <div>
     <v-row>
-      <!-- Stats Cards -->
+      
       <v-col cols="12" md="3">
         <v-card color="primary" variant="tonal">
           <v-card-text>
@@ -58,7 +58,7 @@
         </v-card>
       </v-col>
 
-      <!-- Recent Activity -->
+      
       <v-col cols="12" md="6">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -98,7 +98,7 @@
         </v-card>
       </v-col>
 
-      <!-- Top Accounts -->
+      
       <v-col cols="12" md="6">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -137,7 +137,7 @@
         </v-card>
       </v-col>
 
-      <!-- Ledger Distribution -->
+      
       <v-col cols="12" md="6">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -165,7 +165,7 @@
         </v-card>
       </v-col>
 
-      <!-- Transfer Volume Chart -->
+      
       <v-col cols="12" md="6">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -195,7 +195,7 @@
         </v-card>
       </v-col>
 
-      <!-- System Health -->
+      
       <v-col cols="12">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -283,7 +283,7 @@ const maxDailyTransfers = computed(() => {
 
 onMounted(() => {
   loadDashboardData();
-  // Refresh every 30 seconds
+  
   refreshInterval = window.setInterval(() => {
     loadDashboardData();
   }, 30000);
@@ -302,7 +302,7 @@ async function loadDashboardData() {
   const startTime = Date.now();
 
   try {
-    // Load accounts
+    
     const accountsResult = await window.tigerBeetleApi.getAccounts(1000, 0);
     if (accountsResult.success) {
       const data = accountsResult.data;
@@ -312,13 +312,13 @@ async function loadDashboardData() {
       stats.value.totalAccounts =
         data && "total" in data ? data.total : accounts.length;
 
-      // Calculate total volume and top accounts
+      
       const sortedAccounts = [...accounts].sort((a, b) =>
         Number(BigInt(b.balance || "0") - BigInt(a.balance || "0"))
       );
       topAccounts.value = sortedAccounts.slice(0, 10);
 
-      // Ledger distribution
+      
       const ledgerMap = new Map<number, number>();
       accounts.forEach((acc: any) => {
         ledgerMap.set(acc.ledger, (ledgerMap.get(acc.ledger) || 0) + 1);
@@ -330,7 +330,7 @@ async function loadDashboardData() {
       stats.value.activeLedgers = ledgerMap.size;
     }
 
-    // Load transfers
+    
     const transfersResult = await window.tigerBeetleApi.getTransfers(1000, 0);
     if (transfersResult.success) {
       const data = transfersResult.data;
@@ -340,7 +340,7 @@ async function loadDashboardData() {
       stats.value.totalTransfers =
         data && "total" in data ? data.total : transfers.length;
 
-      // Calculate total volume
+      
       let totalVolume = BigInt(0);
       transfers.forEach((t: any) => {
         totalVolume += BigInt(t.amount || "0");
@@ -350,14 +350,14 @@ async function loadDashboardData() {
         globalCurrency.value
       );
 
-      // Recent transfers (last 24 hours)
+      
       const now = Date.now() / 1000;
       const oneDayAgo = now - 86400;
       recentTransfers.value = transfers
         .filter((t: any) => t.created_at >= oneDayAgo)
         .sort((a: any, b: any) => b.created_at - a.created_at);
 
-      // Transfer activity (last 7 days)
+      
       calculateTransferActivity(transfers);
     }
 

@@ -42,7 +42,7 @@
       </v-alert>
 
       <v-card-text>
-        <!-- Templates Grid -->
+        
         <v-row v-if="templates.length > 0">
           <v-col
             v-for="template in templates"
@@ -113,7 +113,7 @@
           No templates created yet. Create your first template to get started!
         </v-alert>
 
-        <!-- Predefined Templates -->
+        
         <v-divider class="my-6" />
         <div class="text-h6 mb-4">Predefined Templates</div>
         <v-row>
@@ -146,7 +146,7 @@
       </v-card-text>
     </v-card>
 
-    <!-- Create/Edit Template Dialog -->
+    
     <v-dialog v-model="showCreateDialog" max-width="800" persistent>
       <v-card>
         <v-card-title>
@@ -294,7 +294,7 @@
       </v-card>
     </v-dialog>
 
-    <!-- Execute Template Dialog -->
+    
     <v-dialog v-model="showExecuteDialog" max-width="600" persistent>
       <v-card>
         <v-card-title
@@ -651,7 +651,7 @@ async function confirmExecute() {
     );
     const amountStr = getResolvedValue(selectedTemplate.value.amount);
 
-    // Validate
+    
     if (!isValidTBID(debitAccount)) {
       error.value = "Invalid debit account ID";
       return;
@@ -661,7 +661,7 @@ async function confirmExecute() {
       return;
     }
 
-    // Parse amount
+    
     const amount = parseTBAmount(amountStr);
 
     const result = await window.tigerBeetleApi.createTransfer({
