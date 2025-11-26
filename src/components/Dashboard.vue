@@ -113,7 +113,7 @@
         <v-card>
           <v-card-title class="d-flex align-center">
             <v-icon icon="mdi-clock-outline" class="mr-2" />
-            Recent Transfers (24h)
+            Recent Transfers 
           </v-card-title>
           <v-card-text>
             <v-list v-if="recentTransfers.length > 0" density="compact">
