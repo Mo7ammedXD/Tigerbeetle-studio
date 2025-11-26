@@ -40,6 +40,27 @@ export interface PaginatedResponse<T> {
   offset: number;
 }
 
+export interface QueryAccountsFilter {
+  ledger?: number;
+  code?: number;
+  timestamp_min?: string;
+  timestamp_max?: string;
+  limit?: number;
+  flags?: number;
+  reversed?: boolean;
+}
+
+export interface QueryTransfersFilter {
+  ledger?: number;
+  code?: number;
+  timestamp_min?: string;
+  timestamp_max?: string;
+  limit?: number;
+  flags?: number;
+  reversed?: boolean;
+  account_id?: string;
+}
+
 export interface TigerBeetleApi {
   connect: (config: ConnectionConfig) => Promise<ApiResponse>;
   disconnect: () => Promise<ApiResponse>;
@@ -56,6 +77,15 @@ export interface TigerBeetleApi {
     limit?: number,
     offset?: number
   ) => Promise<ApiResponse<PaginatedResponse<any> | any[]>>;
+  importAccountsFromJson: (filePath: string) => Promise<ApiResponse<any>>;
+  lookupAccountsByIds: (ids: string[]) => Promise<ApiResponse<any[]>>;
+  lookupTransfersByIds: (ids: string[]) => Promise<ApiResponse<any[]>>;
+  queryAccounts: (filter: QueryAccountsFilter) => Promise<ApiResponse<any[]>>;
+  queryTransfers: (filter: QueryTransfersFilter) => Promise<ApiResponse<any[]>>;
+  getAccountTransfers: (
+    accountId: string,
+    limit?: number
+  ) => Promise<ApiResponse<any[]>>;
 }
 
 declare global {

@@ -77,30 +77,8 @@
 
         <v-divider class="my-2" />
         <v-list-subheader>TOOLS</v-list-subheader>
-        <v-list-item
-          prepend-icon="mdi-database-search"
-          title="Query Builder"
-          value="query"
-          :active="activeView === 'query'"
-          @click="activeView = 'query'"
-          color="primary"
-        />
-        <v-list-item
-          prepend-icon="mdi-history"
-          title="Account History"
-          value="history"
-          :active="activeView === 'history'"
-          @click="activeView = 'history'"
-          color="primary"
-        />
-        <v-list-item
-          prepend-icon="mdi-file-upload"
-          title="Bulk Operations"
-          value="bulk"
-          :active="activeView === 'bulk'"
-          @click="activeView = 'bulk'"
-          color="primary"
-        />
+     
+
         <v-list-item
           prepend-icon="mdi-database-export"
           title="Backup & Export"
@@ -128,14 +106,7 @@
           @click="activeView = 'templates'"
           color="primary"
         />
-        <v-list-item
-          prepend-icon="mdi-clock-alert"
-          title="Pending Transfers"
-          value="pending"
-          :active="activeView === 'pending'"
-          @click="activeView = 'pending'"
-          color="primary"
-        />
+
         <v-list-item
           prepend-icon="mdi-server-network"
           title="Cluster Manager"
@@ -155,14 +126,6 @@
 
         <v-divider class="my-2" />
         <v-list-subheader>VISUALIZATION</v-list-subheader>
-        <v-list-item
-          prepend-icon="mdi-chart-box"
-          title="Data Visualization"
-          value="visualization"
-          :active="activeView === 'visualization'"
-          @click="activeView = 'visualization'"
-          color="primary"
-        />
         <v-list-item
           prepend-icon="mdi-graph"
           title="Flow Visualizer"
@@ -190,19 +153,7 @@
           :is-connected="isConnected"
           @refresh="checkConnection"
         />
-        <QueryBuilder
-          v-else-if="activeView === 'query'"
-          :is-connected="isConnected"
-        />
-        <AccountHistory
-          v-else-if="activeView === 'history'"
-          :is-connected="isConnected"
-        />
-        <BulkOperations
-          v-else-if="activeView === 'bulk'"
-          :is-connected="isConnected"
-          @refresh="checkConnection"
-        />
+      
         <BackupExport
           v-else-if="activeView === 'backup'"
           :is-connected="isConnected"
@@ -216,11 +167,7 @@
           :is-connected="isConnected"
           @refresh="checkConnection"
         />
-        <PendingTransfers
-          v-else-if="activeView === 'pending'"
-          :is-connected="isConnected"
-          @refresh="checkConnection"
-        />
+
         <ClusterManager
           v-else-if="activeView === 'clusters'"
           :is-connected="isConnected"
@@ -230,10 +177,7 @@
           v-else-if="activeView === 'ledgerconfig'"
           :is-connected="isConnected"
         />
-        <DataVisualization
-          v-else-if="activeView === 'visualization'"
-          :is-connected="isConnected"
-        />
+
         <FlowVisualizer
           v-else-if="activeView === 'flow'"
           :is-connected="isConnected"
@@ -253,20 +197,18 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import { useTheme } from "vuetify";
-import AccountHistory from "./components/AccountHistory.vue";
 import AccountsView from "./components/AccountsView.vue";
 import AdvancedSearch from "./components/AdvancedSearch.vue";
 import BackupExport from "./components/BackupExport.vue";
-import BulkOperations from "./components/BulkOperations.vue";
+
 import ClusterManager from "./components/ClusterManager.vue";
 import ConnectionModal from "./components/ConnectionModal.vue";
 import Dashboard from "./components/Dashboard.vue";
-import DataVisualization from "./components/DataVisualization.vue";
 import FlowVisualizer from "./components/FlowVisualizer.vue";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog.vue";
 import LedgerConfig from "./components/LedgerConfig.vue";
-import PendingTransfers from "./components/PendingTransfers.vue";
-import QueryBuilder from "./components/QueryBuilder.vue";
+
+
 import TransfersView from "./components/TransfersView.vue";
 import TransferTemplates from "./components/TransferTemplates.vue";
 import { useKeyboardShortcuts } from "./composables/useKeyboardShortcuts";
@@ -314,7 +256,6 @@ function showShortcuts() {
 }
 
 useKeyboardShortcuts([
-  // Navigation
   {
     key: "1",
     ctrl: true,
@@ -334,19 +275,6 @@ useKeyboardShortcuts([
     action: () => (activeView.value = "transfers"),
   },
   {
-    key: "4",
-    ctrl: true,
-    description: "Go to Query Builder",
-    action: () => (activeView.value = "query"),
-  },
-  {
-    key: "5",
-    ctrl: true,
-    description: "Go to Account History",
-    action: () => (activeView.value = "history"),
-  },
-  // Actions
-  {
     key: "r",
     ctrl: true,
     description: "Refresh Data",
@@ -364,7 +292,6 @@ useKeyboardShortcuts([
     description: "Go to Export/Backup",
     action: () => (activeView.value = "backup"),
   },
-  // Views
   {
     key: "d",
     ctrl: true,

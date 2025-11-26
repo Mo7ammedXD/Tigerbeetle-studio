@@ -50,6 +50,8 @@
           density="comfortable"
           v-model:expanded="expanded"
           show-expand
+          :items-per-page="-1"
+          hide-default-footer
         >
           <template #item.id="{ item }">
             <code class="text-caption">{{ item.id }}</code>
@@ -178,29 +180,42 @@
             </div>
           </template>
         </v-data-table>
+      </v-card-text>
 
-        <v-card-actions
-          v-if="totalItems > itemsPerPage"
-          class="justify-center pa-4"
-        >
-          <v-pagination
-            v-model="page"
-            :length="Math.ceil(totalItems / itemsPerPage)"
-            :total-visible="7"
-            @update:model-value="onPageChange"
-          />
+      <v-divider v-if="transfers.length > 0" />
+
+      <v-card-actions
+        v-if="transfers.length > 0"
+        class="d-flex justify-space-between align-center pa-4"
+      >
+        <div class="text-caption text-grey">
+          Showing {{ (page - 1) * itemsPerPage + 1 }} to
+          {{ Math.min(page * itemsPerPage, totalItems) }} of {{ totalItems }}
+          transfers
+        </div>
+
+        <div class="d-flex align-center">
           <v-select
             v-model="itemsPerPage"
             :items="[25, 50, 100, 200]"
-            label="Items per page"
+            label="Per page"
             density="compact"
             variant="outlined"
-            class="ml-4"
-            style="max-width: 150px"
+            hide-details
+            style="max-width: 120px"
             @update:model-value="onItemsPerPageChange"
           />
-        </v-card-actions>
-      </v-card-text>
+
+          <v-pagination
+            v-model="page"
+            :length="Math.ceil(totalItems / itemsPerPage)"
+            :total-visible="5"
+            size="small"
+            class="ml-4"
+            @update:model-value="onPageChange"
+          />
+        </div>
+      </v-card-actions>
     </v-card>
 
     <CreateTransferModal
@@ -263,7 +278,7 @@ async function loadTransfers() {
 
     if (result.success) {
       const data = result.data;
-      
+
       if (data && typeof data === "object" && "data" in data) {
         transfers.value = data.data || [];
         totalItems.value = data.total || 0;
@@ -325,12 +340,10 @@ function handleTransferCreated() {
   emit("refresh");
 }
 
-
 watch(
   () => props.isConnected,
   (newValue: boolean, oldValue: boolean) => {
     if (newValue && !oldValue) {
-      
       loadTransfers();
     }
   }
@@ -339,7 +352,6 @@ watch(
 onMounted(() => {
   loadTransfers();
 });
-
 
 onActivated(() => {
   if (props.isConnected) {

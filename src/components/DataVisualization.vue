@@ -26,7 +26,6 @@
       </v-alert>
 
       <v-card-text>
-        
         <v-row class="mb-4">
           <v-col cols="12" md="3">
             <v-select
@@ -70,9 +69,7 @@
           </v-col>
         </v-row>
 
-        
         <v-row>
-          
           <v-col
             cols="12"
             lg="6"
@@ -110,7 +107,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col
             cols="12"
             lg="6"
@@ -144,7 +140,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col
             cols="12"
             lg="6"
@@ -178,7 +173,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col
             cols="12"
             lg="6"
@@ -195,8 +189,9 @@
                     v-for="ledger in stats.ledgerBreakdown"
                     :key="ledger.id"
                   >
-                    <v-list-item-title
-                      >Ledger {{ ledger.id }}</v-list-item-title
+                    <v-list-item-title>{{ ledger.name }}</v-list-item-title>
+                    <v-list-item-subtitle
+                      >Ledger ID: {{ ledger.id }}</v-list-item-subtitle
                     >
                     <template #append>
                       <v-chip size="small" color="primary">
@@ -209,7 +204,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col
             cols="12"
             v-if="selectedChart === 'all' || selectedChart === 'top'"
@@ -225,7 +219,7 @@
                 >
                   <template #item.balance="{ item }">
                     <v-chip :color="getBalanceColor(item.balance)" size="small">
-                      {{ formatAmount(item.balance) }}
+                      {{ formatAmount(item.balance, item.ledger) }}
                     </v-chip>
                   </template>
                   <template #item.activity="{ item }">
@@ -242,7 +236,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col
             cols="12"
             v-if="selectedChart === 'all' || selectedChart === 'custom'"
@@ -310,11 +303,19 @@
 </template>
 
 <script setup lang="ts">
+import { useCurrency } from "@/composables/useCurrency";
 import { formatTBAmount, isPositiveTBAmount } from "@/utils/bigint";
 import { Chart, registerables } from "chart.js";
 import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 
 Chart.register(...registerables);
+
+const {
+  getCurrencyForLedger,
+  getLedgerName,
+  getAccountCodeName,
+  getTransferCodeName,
+} = useCurrency();
 
 interface Props {
   isConnected: boolean;
@@ -365,6 +366,8 @@ const groupByOptions = [
 
 const topAccountsHeaders = [
   { title: "Alias", key: "alias" },
+  { title: "Ledger", key: "ledgerName" },
+  { title: "Code", key: "codeName" },
   { title: "Balance", key: "balance", align: "end" as const },
   { title: "Activity", key: "activity" },
   { title: "Transfers", key: "transferCount", align: "end" as const },
@@ -418,8 +421,8 @@ async function loadData() {
 
   try {
     const [accountsResult, transfersResult] = await Promise.all([
-      window.tigerBeetleApi.getAccounts(10000, 0),
-      window.tigerBeetleApi.getTransfers(10000, 0),
+      window.tigerBeetleApi.getAccounts(100, 0),
+      window.tigerBeetleApi.getTransfers(100, 0),
     ]);
 
     if (accountsResult.success && transfersResult.success) {
@@ -450,7 +453,6 @@ async function loadData() {
 }
 
 function processData(accounts: any[], transfers: any[]) {
-  
   const totalVolume = transfers.reduce(
     (sum, t) => sum + BigInt(t.amount || "0"),
     BigInt(0)
@@ -463,7 +465,6 @@ function processData(accounts: any[], transfers: any[]) {
   ).length;
   const negativeAccounts = accounts.length - positiveAccounts;
 
-  
   const hourCounts = new Array(24).fill(0);
   transfers.forEach((t) => {
     const timestamp = Number(BigInt(t.timestamp || "0") / 1000000n) / 1000;
@@ -472,7 +473,6 @@ function processData(accounts: any[], transfers: any[]) {
   });
   const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
 
-  
   const dayCounts: Record<string, number> = {};
   const dayNames = [
     "Sunday",
@@ -493,7 +493,6 @@ function processData(accounts: any[], transfers: any[]) {
     "Monday"
   );
 
-  
   const ledgerMap: Record<string, number> = {};
   transfers.forEach((t) => {
     const ledger = t.ledger || "0";
@@ -502,9 +501,9 @@ function processData(accounts: any[], transfers: any[]) {
   const ledgerBreakdown = Object.entries(ledgerMap).map(([id, count]) => ({
     id,
     count,
+    name: getLedgerName(parseInt(id)),
   }));
 
-  
   const accountTransferCounts: Record<string, number> = {};
   transfers.forEach((t) => {
     accountTransferCounts[t.debit_account_id] =
@@ -518,9 +517,13 @@ function processData(accounts: any[], transfers: any[]) {
     .map((a) => ({
       alias: a.alias || a.id.substring(0, 12),
       balance: a.balance || "0",
+      ledger: a.ledger,
+      code: a.code,
       transferCount: accountTransferCounts[a.id] || 0,
       activityPercent:
         ((accountTransferCounts[a.id] || 0) / maxTransfers) * 100,
+      ledgerName: getLedgerName(a.ledger),
+      codeName: getAccountCodeName(a.ledger, a.code),
     }))
     .sort((a, b) => b.transferCount - a.transferCount)
     .slice(0, 10);
@@ -564,7 +567,6 @@ function renderVolumeChart(transfers: any[]) {
   const ctx = volumeChart.value.getContext("2d");
   if (!ctx) return;
 
-  
   const groupedData = groupTransfersByTime(transfers);
 
   volumeChartInstance = new Chart(ctx, {
@@ -695,7 +697,7 @@ function renderLedgerChart(transfers: any[]) {
   ledgerChartInstance = new Chart(ctx, {
     type: "doughnut",
     data: {
-      labels: Object.keys(ledgerMap).map((id) => `Ledger ${id}`),
+      labels: Object.keys(ledgerMap).map((id) => getLedgerName(parseInt(id))),
       datasets: [
         {
           data: Object.values(ledgerMap),
@@ -721,7 +723,6 @@ function groupTransfersByTime(transfers: any[]) {
   const labels: string[] = [];
   const values: number[] = [];
 
-  
   for (let i = 6; i >= 0; i--) {
     const date = new Date(now - i * 24 * 60 * 60 * 1000);
     labels.push(
@@ -762,7 +763,6 @@ function destroyCharts() {
 }
 
 function exportChart() {
-  
   const canvas = volumeChart.value;
   if (canvas) {
     const url = canvas.toDataURL("image/png");
@@ -773,7 +773,11 @@ function exportChart() {
   }
 }
 
-function formatAmount(value: string): string {
+function formatAmount(value: string, ledgerId?: number): string {
+  if (ledgerId !== undefined) {
+    const currency = getCurrencyForLedger(ledgerId);
+    return formatTBAmount(value, currency);
+  }
   return formatTBAmount(value);
 }
 

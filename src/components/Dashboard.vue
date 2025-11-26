@@ -1,8 +1,73 @@
 <template>
   <div>
     <v-row>
-      
-      <v-col cols="12" md="3">
+      <v-col cols="12" class="mb-4">
+        <v-text-field
+          v-model="searchQuery"
+          label="Search Accounts or Transfers"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="comfortable"
+          clearable
+          hint="Search by account ID, alias, or transfer ID (min 3 characters)"
+          persistent-hint
+          @update:model-value="onSearch"
+        />
+      </v-col>
+
+      <v-col v-if="searchResults.length > 0" cols="12">
+        <v-card>
+          <v-card-title class="d-flex align-center">
+            <v-icon icon="mdi-magnify" class="mr-2" />
+            Search Results ({{ searchResults.length }})
+          </v-card-title>
+          <v-card-text>
+            <v-list density="compact">
+              <v-list-item
+                v-for="result in searchResults.slice(0, 10)"
+                :key="result.data.id"
+              >
+                <template #prepend>
+                  <v-icon
+                    :icon="
+                      result.type === 'account'
+                        ? 'mdi-account'
+                        : 'mdi-bank-transfer'
+                    "
+                    :color="result.type === 'account' ? 'primary' : 'success'"
+                  />
+                </template>
+                <v-list-item-title v-if="result.type === 'account'">
+                  {{ result.data.alias }} ({{
+                    result.data.id.substring(0, 12)
+                  }}...)
+                </v-list-item-title>
+                <v-list-item-title v-else>
+                  Transfer:
+                  {{
+                    result.data.debit_alias ||
+                    result.data.debit_account_id.substring(0, 12)
+                  }}
+                  →
+                  {{
+                    result.data.credit_alias ||
+                    result.data.credit_account_id.substring(0, 12)
+                  }}
+                </v-list-item-title>
+                <v-list-item-subtitle v-if="result.type === 'account'">
+                  Balance: {{ formatAmount(result.data.balance) }} • Ledger
+                  {{ result.data.ledger }}
+                </v-list-item-subtitle>
+                <v-list-item-subtitle v-else>
+                  Amount: {{ formatAmount(result.data.amount) }}
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" md="4">
         <v-card color="primary" variant="tonal">
           <v-card-text>
             <div class="d-flex align-center justify-space-between">
@@ -16,7 +81,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="4">
         <v-card color="success" variant="tonal">
           <v-card-text>
             <div class="d-flex align-center justify-space-between">
@@ -30,21 +95,7 @@
         </v-card>
       </v-col>
 
-      <v-col cols="12" md="3">
-        <v-card color="info" variant="tonal">
-          <v-card-text>
-            <div class="d-flex align-center justify-space-between">
-              <div>
-                <div class="text-caption">Total Volume</div>
-                <div class="text-h5">{{ formatAmount(stats.totalVolume) }}</div>
-              </div>
-              <v-icon icon="mdi-currency-usd" size="48" />
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="4">
         <v-card color="warning" variant="tonal">
           <v-card-text>
             <div class="d-flex align-center justify-space-between">
@@ -58,7 +109,6 @@
         </v-card>
       </v-col>
 
-      
       <v-col cols="12" md="6">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -86,8 +136,9 @@
                   }}
                 </v-list-item-title>
                 <v-list-item-subtitle>
-                  {{ formatAmount(transfer.amount) }} •
-                  {{ formatTime(transfer.created_at) }}
+                  {{ formatAmountWithLedger(transfer.amount, transfer.ledger) }}
+                  • {{ getTransferCodeName(transfer.ledger, transfer.code) }} •
+                  {{ formatTimestamp(transfer.timestamp) }}
                 </v-list-item-subtitle>
               </v-list-item>
             </v-list>
@@ -98,7 +149,6 @@
         </v-card>
       </v-col>
 
-      
       <v-col cols="12" md="6">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -118,14 +168,17 @@
                 </template>
                 <v-list-item-title>{{ account.alias }}</v-list-item-title>
                 <v-list-item-subtitle>
-                  Ledger {{ account.ledger }} • Code {{ account.code }}
+                  {{ getLedgerName(account.ledger) }} •
+                  {{ getAccountCodeName(account.ledger, account.code) }}
                 </v-list-item-subtitle>
                 <template #append>
                   <v-chip
                     :color="getBalanceColor(account.balance)"
                     size="small"
                   >
-                    {{ formatAmount(account.balance) }}
+                    {{
+                      formatAmountWithLedger(account.balance, account.ledger)
+                    }}
                   </v-chip>
                 </template>
               </v-list-item>
@@ -137,65 +190,6 @@
         </v-card>
       </v-col>
 
-      
-      <v-col cols="12" md="6">
-        <v-card>
-          <v-card-title class="d-flex align-center">
-            <v-icon icon="mdi-chart-pie" class="mr-2" />
-            Accounts by Ledger
-          </v-card-title>
-          <v-card-text>
-            <div v-if="ledgerDistribution.length > 0">
-              <v-list density="compact">
-                <v-list-item
-                  v-for="ledger in ledgerDistribution"
-                  :key="ledger.id"
-                >
-                  <v-list-item-title>Ledger {{ ledger.id }}</v-list-item-title>
-                  <template #append>
-                    <v-chip size="small">{{ ledger.count }} accounts</v-chip>
-                  </template>
-                </v-list-item>
-              </v-list>
-            </div>
-            <v-alert v-else type="info" variant="tonal">
-              No data available
-            </v-alert>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      
-      <v-col cols="12" md="6">
-        <v-card>
-          <v-card-title class="d-flex align-center">
-            <v-icon icon="mdi-chart-line" class="mr-2" />
-            Transfer Activity (Last 7 Days)
-          </v-card-title>
-          <v-card-text>
-            <div v-if="transferActivity.length > 0" class="pa-4">
-              <div v-for="day in transferActivity" :key="day.date" class="mb-3">
-                <div class="d-flex justify-space-between mb-1">
-                  <span class="text-caption">{{ day.date }}</span>
-                  <span class="text-caption font-weight-bold"
-                    >{{ day.count }} transfers</span
-                  >
-                </div>
-                <v-progress-linear
-                  :model-value="(day.count / maxDailyTransfers) * 100"
-                  color="primary"
-                  height="8"
-                />
-              </div>
-            </div>
-            <v-alert v-else type="info" variant="tonal">
-              No transfer activity
-            </v-alert>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      
       <v-col cols="12">
         <v-card>
           <v-card-title class="d-flex align-center">
@@ -253,7 +247,13 @@ import { useCurrency } from "@/composables/useCurrency";
 import { formatTBAmount, isPositiveTBAmount } from "@/utils/bigint";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 
-const { loadCurrency, globalCurrency } = useCurrency();
+const {
+  loadCurrency,
+  getCurrencyForLedger,
+  getLedgerName,
+  getAccountCodeName,
+  getTransferCodeName,
+} = useCurrency();
 
 interface Props {
   isConnected: boolean;
@@ -274,19 +274,23 @@ const ledgerDistribution = ref<any[]>([]);
 const transferActivity = ref<any[]>([]);
 const lastSyncTime = ref("Never");
 const avgResponseTime = ref(0);
+const searchQuery = ref("");
+const searchResults = ref<any[]>([]);
 
 let refreshInterval: number | null = null;
+let lastRefreshTime = 0;
+const MIN_REFRESH_INTERVAL = 5000;
 
 const maxDailyTransfers = computed(() => {
   return Math.max(...transferActivity.value.map((d) => d.count), 1);
 });
 
 onMounted(() => {
-  loadDashboardData();
-  
+  loadDashboardData(true);
+
   refreshInterval = window.setInterval(() => {
     loadDashboardData();
-  }, 30000);
+  }, 60000);
 });
 
 onUnmounted(() => {
@@ -295,15 +299,24 @@ onUnmounted(() => {
   }
 });
 
-async function loadDashboardData() {
+async function loadDashboardData(force: boolean = false) {
   if (!props.isConnected) return;
+
+  const now = Date.now();
+  if (
+    !force &&
+    lastRefreshTime &&
+    now - lastRefreshTime < MIN_REFRESH_INTERVAL
+  ) {
+    return;
+  }
+  lastRefreshTime = now;
 
   loadCurrency();
   const startTime = Date.now();
 
   try {
-    
-    const accountsResult = await window.tigerBeetleApi.getAccounts(1000, 0);
+    const accountsResult = await window.tigerBeetleApi.getAccounts(25, 0);
     if (accountsResult.success) {
       const data = accountsResult.data;
       const accounts =
@@ -312,26 +325,27 @@ async function loadDashboardData() {
       stats.value.totalAccounts =
         data && "total" in data ? data.total : accounts.length;
 
-      
       const sortedAccounts = [...accounts].sort((a, b) =>
         Number(BigInt(b.balance || "0") - BigInt(a.balance || "0"))
       );
-      topAccounts.value = sortedAccounts.slice(0, 10);
+      topAccounts.value = sortedAccounts.slice(0, 5);
 
-      
       const ledgerMap = new Map<number, number>();
       accounts.forEach((acc: any) => {
         ledgerMap.set(acc.ledger, (ledgerMap.get(acc.ledger) || 0) + 1);
       });
       ledgerDistribution.value = Array.from(ledgerMap.entries())
-        .map(([id, count]) => ({ id, count }))
+        .map(([id, count]) => ({
+          id,
+          count,
+          name: getLedgerName(id),
+        }))
         .sort((a, b) => b.count - a.count);
 
       stats.value.activeLedgers = ledgerMap.size;
     }
 
-    
-    const transfersResult = await window.tigerBeetleApi.getTransfers(1000, 0);
+    const transfersResult = await window.tigerBeetleApi.getTransfers(25, 0);
     if (transfersResult.success) {
       const data = transfersResult.data;
       const transfers =
@@ -340,32 +354,34 @@ async function loadDashboardData() {
       stats.value.totalTransfers =
         data && "total" in data ? data.total : transfers.length;
 
-      
       let totalVolume = BigInt(0);
       transfers.forEach((t: any) => {
         totalVolume += BigInt(t.amount || "0");
       });
-      stats.value.totalVolume = formatTBAmount(
-        totalVolume.toString(),
-        globalCurrency.value
-      );
+      stats.value.totalVolume = totalVolume.toString();
 
-      
-      const now = Date.now() / 1000;
-      const oneDayAgo = now - 86400;
+      const now = BigInt(Date.now()) * BigInt(1000000);
+      const oneDayAgo = now - BigInt(86400) * BigInt(1000000000);
+
       recentTransfers.value = transfers
-        .filter((t: any) => t.created_at >= oneDayAgo)
-        .sort((a: any, b: any) => b.created_at - a.created_at);
+        .filter((t: any) => {
+          const timestamp = BigInt(t.timestamp || "0");
+          return timestamp >= oneDayAgo;
+        })
+        .sort((a: any, b: any) => {
+          const aTime = BigInt(a.timestamp || "0");
+          const bTime = BigInt(b.timestamp || "0");
+          return Number(bTime - aTime);
+        })
+        .slice(0, 10);
 
-      
       calculateTransferActivity(transfers);
     }
 
     const endTime = Date.now();
     avgResponseTime.value = endTime - startTime;
     lastSyncTime.value = new Date().toLocaleTimeString();
-  } catch (error) {
-  }
+  } catch (error) {}
 }
 
 function calculateTransferActivity(transfers: any[]) {
@@ -377,12 +393,13 @@ function calculateTransferActivity(transfers: any[]) {
     date.setDate(date.getDate() - i);
     date.setHours(0, 0, 0, 0);
 
-    const dayStart = date.getTime() / 1000;
-    const dayEnd = dayStart + 86400;
+    const dayStart = BigInt(date.getTime()) * BigInt(1000000);
+    const dayEnd = dayStart + BigInt(86400) * BigInt(1000000000);
 
-    const count = transfers.filter(
-      (t: any) => t.created_at >= dayStart && t.created_at < dayEnd
-    ).length;
+    const count = transfers.filter((t: any) => {
+      const timestamp = BigInt(t.timestamp || "0");
+      return timestamp >= dayStart && timestamp < dayEnd;
+    }).length;
 
     activity.push({
       date: date.toLocaleDateString("en-US", {
@@ -401,19 +418,87 @@ function formatAmount(value: string | number): string {
   return formatTBAmount(strValue);
 }
 
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
+function formatAmountWithLedger(
+  value: string | number,
+  ledgerId: number
+): string {
+  const strValue = typeof value === "string" ? value : value.toString();
+  const currency = getCurrencyForLedger(ledgerId);
+  return formatTBAmount(strValue, currency);
+}
 
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
+function formatTimestamp(timestamp: string | number): string {
+  try {
+    const timestampBigInt = BigInt(timestamp);
+    const milliseconds = Number(timestampBigInt / BigInt(1000000));
+    const date = new Date(milliseconds);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
 
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  } catch {
+    return "Unknown";
+  }
+}
+
+async function onSearch() {
+  if (!searchQuery.value || searchQuery.value.length < 3) {
+    searchResults.value = [];
+    return;
+  }
+
+  try {
+    const query = searchQuery.value.toLowerCase();
+    const [accountsResult, transfersResult] = await Promise.all([
+      window.tigerBeetleApi.getAccounts(20, 0),
+      window.tigerBeetleApi.getTransfers(20, 0),
+    ]);
+
+    const accountsData = accountsResult.success ? accountsResult.data : null;
+    const accounts =
+      accountsData && typeof accountsData === "object" && "data" in accountsData
+        ? accountsData.data
+        : Array.isArray(accountsData)
+        ? accountsData
+        : [];
+
+    const transfersData = transfersResult.success ? transfersResult.data : null;
+    const transfers =
+      transfersData &&
+      typeof transfersData === "object" &&
+      "data" in transfersData
+        ? transfersData.data
+        : Array.isArray(transfersData)
+        ? transfersData
+        : [];
+
+    const matchedAccounts = accounts.filter(
+      (acc: any) =>
+        acc.id?.toLowerCase().includes(query) ||
+        acc.alias?.toLowerCase().includes(query)
+    );
+
+    const matchedTransfers = transfers.filter(
+      (t: any) =>
+        t.id?.toLowerCase().includes(query) ||
+        t.debit_account_id?.toLowerCase().includes(query) ||
+        t.credit_account_id?.toLowerCase().includes(query)
+    );
+
+    searchResults.value = [
+      ...matchedAccounts.map((a: any) => ({ type: "account", data: a })),
+      ...matchedTransfers.map((t: any) => ({ type: "transfer", data: t })),
+    ];
+  } catch (error) {
+    searchResults.value = [];
+  }
 }
 
 function getBalanceColor(balance: string): string {

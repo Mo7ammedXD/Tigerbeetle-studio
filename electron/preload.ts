@@ -87,14 +87,32 @@ const api = {
   ): Promise<ApiResponse<any>> => {
     return ipcRenderer.invoke("get-transfers", limit, offset);
   },
+
+  lookupTransfersByIds: (ids: string[]): Promise<ApiResponse<any[]>> => {
+    return ipcRenderer.invoke("lookup-transfers-by-ids", ids);
+  },
+
+  queryAccounts: (filter: any): Promise<ApiResponse<any[]>> => {
+    return ipcRenderer.invoke("query-accounts", filter);
+  },
+
+  queryTransfers: (filter: any): Promise<ApiResponse<any[]>> => {
+    return ipcRenderer.invoke("query-transfers", filter);
+  },
+
+  getAccountTransfers: (
+    accountId: string,
+    limit?: number
+  ): Promise<ApiResponse<any[]>> => {
+    return ipcRenderer.invoke("get-account-transfers", accountId, limit);
+  },
 };
 
 // Expose the API to the renderer process
 
 try {
   contextBridge.exposeInMainWorld("tigerBeetleApi", api);
-} catch (error) {
-}
+} catch (error) {}
 
 // TypeScript declaration for window object
 declare global {

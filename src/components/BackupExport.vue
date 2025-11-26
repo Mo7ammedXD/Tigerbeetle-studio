@@ -32,7 +32,6 @@
 
       <v-card-text>
         <v-row>
-          
           <v-col cols="12" md="6">
             <v-card variant="outlined">
               <v-card-title class="bg-primary">
@@ -93,7 +92,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col cols="12" md="6">
             <v-card variant="outlined">
               <v-card-title class="bg-success">
@@ -155,7 +153,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col cols="12">
             <v-card variant="outlined">
               <v-card-title class="bg-warning">
@@ -211,7 +208,6 @@
             </v-card>
           </v-col>
 
-          
           <v-col cols="12">
             <v-card variant="outlined">
               <v-card-title>
@@ -253,7 +249,6 @@
       </v-card-text>
     </v-card>
 
-    
     <v-dialog v-model="showProgress" persistent max-width="500">
       <v-card>
         <v-card-title>{{ progressTitle }}</v-card-title>
@@ -275,13 +270,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { BackupService } from "../services/backup.service";
+import { ExportService } from "../services/export.service";
+import { ImportService } from "../services/import.service";
+import type {
+  BackupOptions,
+  ExportOptions,
+  ImportOptions,
+} from "../types/backup.types";
 
-interface Props {
+const props = defineProps<{
   isConnected: boolean;
-}
-
-const props = defineProps<Props>();
+}>();
 
 const error = ref<string | null>(null);
 const success = ref<string | null>(null);
@@ -293,7 +294,12 @@ const progress = ref(0);
 const progressTitle = ref("");
 const progressMessage = ref("");
 
-const exportOptions = ref({
+const exportOptions = ref<{
+  entity: string;
+  format: string;
+  includeMetadata: boolean;
+  compress: boolean;
+}>({
   entity: "All Data",
   format: "JSON",
   includeMetadata: true,
@@ -336,90 +342,43 @@ async function executeExport() {
   exporting.value = true;
   showProgress.value = true;
   progressTitle.value = "Exporting Data";
-  progress.value = 0;
   error.value = null;
 
   try {
-    let data: any = {};
+    const entityMap: Record<string, "all" | "accounts" | "transfers"> = {
+      "All Data": "all",
+      "Accounts Only": "accounts",
+      "Transfers Only": "transfers",
+    };
 
-    
-    if (exportOptions.value.entity !== "Transfers Only") {
-      progressMessage.value = "Fetching accounts...";
-      progress.value = 25;
+    const formatMap: Record<string, "json" | "csv" | "sql"> = {
+      JSON: "json",
+      CSV: "csv",
+      SQL: "sql",
+    };
 
-      const accountsResult = await window.tigerBeetleApi.getAccounts(10000, 0);
-      if (accountsResult.success) {
-        const accountsData = accountsResult.data;
-        data.accounts =
-          accountsData && "data" in accountsData
-            ? accountsData.data
-            : accountsData;
+    const options: ExportOptions = {
+      entity: entityMap[exportOptions.value.entity] || "all",
+      format: formatMap[exportOptions.value.format] || "json",
+      includeMetadata: exportOptions.value.includeMetadata,
+      compress: exportOptions.value.compress,
+    };
+
+    const result = await ExportService.exportData(
+      options,
+      (prog: number, msg: string) => {
+        progress.value = prog;
+        progressMessage.value = msg;
       }
+    );
+
+    if (result.success) {
+      success.value = `Export completed: ${result.filename} (${formatBytes(
+        result.size
+      )})`;
+    } else {
+      error.value = result.error || "Export failed";
     }
-
-    
-    if (exportOptions.value.entity !== "Accounts Only") {
-      progressMessage.value = "Fetching transfers...";
-      progress.value = 50;
-
-      const transfersResult = await window.tigerBeetleApi.getTransfers(
-        10000,
-        0
-      );
-      if (transfersResult.success) {
-        const transfersData = transfersResult.data;
-        data.transfers =
-          transfersData && "data" in transfersData
-            ? transfersData.data
-            : transfersData;
-      }
-    }
-
-    
-    if (exportOptions.value.includeMetadata) {
-      data.metadata = {
-        exportDate: new Date().toISOString(),
-        version: "1.0",
-        source: "TigerBeetle Studio",
-      };
-    }
-
-    progressMessage.value = "Generating export file...";
-    progress.value = 75;
-
-    
-    let content = "";
-    let filename = "";
-    let mimeType = "";
-
-    if (exportOptions.value.format === "JSON") {
-      content = JSON.stringify(data, null, 2);
-      filename = `tigerbeetle_export_${Date.now()}.json`;
-      mimeType = "application/json";
-    } else if (exportOptions.value.format === "CSV") {
-      
-      content = generateCSV(data);
-      filename = `tigerbeetle_export_${Date.now()}.csv`;
-      mimeType = "text/csv";
-    } else if (exportOptions.value.format === "SQL") {
-      content = generateSQL(data);
-      filename = `tigerbeetle_export_${Date.now()}.sql`;
-      mimeType = "text/plain";
-    }
-
-    progress.value = 100;
-    progressMessage.value = "Download starting...";
-
-    
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    success.value = `Export completed: ${filename}`;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Export failed";
   } finally {
@@ -442,89 +401,34 @@ async function createBackup() {
   backingUp.value = true;
   showProgress.value = true;
   progressTitle.value = "Creating Backup";
-  progress.value = 0;
   error.value = null;
 
   try {
-    const backup: any = {
-      name: backupName.value || `backup_${Date.now()}`,
-      date: new Date().toISOString(),
-      version: "1.0",
+    const options: BackupOptions = {
+      name: backupName.value,
+      includeConfig: backupOptions.value.includeConfig,
+      encrypt: backupOptions.value.encrypt,
+      password: backupPassword.value || undefined,
     };
 
-    
-    progressMessage.value = "Fetching accounts...";
-    progress.value = 20;
-    const accountsResult = await window.tigerBeetleApi.getAccounts(10000, 0);
-    if (accountsResult.success) {
-      const accountsData = accountsResult.data;
-      backup.accounts =
-        accountsData && "data" in accountsData
-          ? accountsData.data
-          : accountsData;
-    }
-
-    progressMessage.value = "Fetching transfers...";
-    progress.value = 40;
-    const transfersResult = await window.tigerBeetleApi.getTransfers(10000, 0);
-    if (transfersResult.success) {
-      const transfersData = transfersResult.data;
-      backup.transfers =
-        transfersData && "data" in transfersData
-          ? transfersData.data
-          : transfersData;
-    }
-
-    if (backupOptions.value.includeConfig) {
-      progressMessage.value = "Including configuration...";
-      progress.value = 60;
-      const config = await window.tigerBeetleApi.getConnectionConfig();
-      backup.config = config;
-    }
-
-    progressMessage.value = "Creating backup file...";
-    progress.value = 80;
-
-    let content = JSON.stringify(backup, null, 2);
-    let filename = `${backup.name}.json`;
-
-    if (backupOptions.value.encrypt) {
-      
-      content = btoa(content);
-      filename = `${backup.name}.encrypted.json`;
-    }
-
-    progress.value = 100;
-    progressMessage.value = "Download starting...";
-
-    
-    const blob = new Blob([content], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    
-    backupHistory.value.unshift({
-      name: backup.name,
-      date: new Date().toLocaleString(),
-      size: formatBytes(blob.size),
-      accounts: backup.accounts?.length || 0,
-      transfers: backup.transfers?.length || 0,
-      filename,
-    });
-
-    
-    localStorage.setItem(
-      "tigerbeetle_backup_history",
-      JSON.stringify(backupHistory.value.slice(0, 10))
+    const result = await BackupService.createBackup(
+      options,
+      (prog: number, msg: string) => {
+        progress.value = prog;
+        progressMessage.value = msg;
+      }
     );
 
-    success.value = `Backup created: ${filename}`;
-    backupName.value = "";
-    backupPassword.value = "";
+    if (result.success) {
+      success.value = `Backup created: ${result.filename} (${formatBytes(
+        result.size
+      )})`;
+      backupName.value = "";
+      backupPassword.value = "";
+      loadBackupHistory();
+    } else {
+      error.value = result.error || "Backup failed";
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Backup failed";
   } finally {
@@ -541,118 +445,54 @@ async function executeImport() {
   progressTitle.value = importOptions.value.dryRun
     ? "Validating Data"
     : "Importing Data";
-  progress.value = 0;
   error.value = null;
 
   try {
     const file = importFile.value[0];
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-      try {
-        let content = e.target?.result as string;
-
-        
-        if (isEncrypted.value) {
-          if (!importPassword.value) {
-            error.value = "Password required for encrypted backup";
-            return;
-          }
-          content = atob(content);
-        }
-
-        const data = JSON.parse(content);
-
-        progressMessage.value = "Validating data...";
-        progress.value = 20;
-
-        if (importOptions.value.dryRun) {
-          
-          const accountsCount = data.accounts?.length || 0;
-          const transfersCount = data.transfers?.length || 0;
-          success.value = `Validation successful: ${accountsCount} accounts, ${transfersCount} transfers`;
-          progress.value = 100;
-        } else {
-          
-          if (data.accounts) {
-            progressMessage.value = `Importing ${data.accounts.length} accounts...`;
-            progress.value = 40;
-            
-          }
-
-          
-          if (data.transfers) {
-            progressMessage.value = `Importing ${data.transfers.length} transfers...`;
-            progress.value = 70;
-            
-          }
-
-          progress.value = 100;
-          success.value = "Import completed successfully";
-        }
-      } catch (err) {
-        error.value = err instanceof Error ? err.message : "Import failed";
-      } finally {
-        importing.value = false;
-        showProgress.value = false;
-      }
+    const options: ImportOptions = {
+      dryRun: importOptions.value.dryRun,
+      skipDuplicates: true,
     };
 
-    reader.readAsText(file);
+    const result = await ImportService.importFromFile(
+      file,
+      options,
+      importPassword.value || undefined,
+      (prog: number, msg: string) => {
+        progress.value = prog;
+        progressMessage.value = msg;
+      }
+    );
+
+    if (result.success) {
+      if (options.dryRun) {
+        success.value = `Validation successful`;
+      } else {
+        success.value = `Import completed: ${result.accountsImported} accounts, ${result.transfersImported} transfers imported`;
+        if (result.accountsSkipped > 0 || result.transfersSkipped > 0) {
+          success.value += ` (${
+            result.accountsSkipped + result.transfersSkipped
+          } skipped)`;
+        }
+      }
+      importFile.value = [];
+      importPassword.value = "";
+    } else {
+      error.value = result.errors.join("\n") || "Import failed";
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Import failed";
+  } finally {
     importing.value = false;
     showProgress.value = false;
   }
 }
 
-function generateCSV(data: any): string {
-  let csv = "";
-
-  if (data.accounts) {
-    csv += "=== ACCOUNTS ===\n";
-    csv += "id,alias,ledger,code,balance,debits_posted,credits_posted\n";
-    data.accounts.forEach((acc: any) => {
-      csv += `"${acc.id}","${acc.alias}",${acc.ledger},${acc.code},"${acc.balance}","${acc.debits_posted}","${acc.credits_posted}"\n`;
-    });
-    csv += "\n";
-  }
-
-  if (data.transfers) {
-    csv += "=== TRANSFERS ===\n";
-    csv += "id,debit_account_id,credit_account_id,amount,ledger,code\n";
-    data.transfers.forEach((t: any) => {
-      csv += `"${t.id}","${t.debit_account_id}","${t.credit_account_id}","${t.amount}",${t.ledger},${t.code}\n`;
-    });
-  }
-
-  return csv;
+function loadBackupHistory() {
+  backupHistory.value = BackupService.getHistory();
 }
 
-function generateSQL(data: any): string {
-  let sql = "-- TigerBeetle Export SQL\n\n";
-
-  if (data.accounts) {
-    sql += "-- Accounts\n";
-    data.accounts.forEach((acc: any) => {
-      sql += `INSERT INTO accounts (id, alias, ledger, code, balance) VALUES ('${acc.id}', '${acc.alias}', ${acc.ledger}, ${acc.code}, '${acc.balance}');\n`;
-    });
-    sql += "\n";
-  }
-
-  if (data.transfers) {
-    sql += "-- Transfers\n";
-    data.transfers.forEach((t: any) => {
-      sql += `INSERT INTO transfers (id, debit_account_id, credit_account_id, amount, ledger, code) VALUES ('${t.id}', '${t.debit_account_id}', '${t.credit_account_id}', '${t.amount}', ${t.ledger}, ${t.code});\n`;
-    });
-  }
-
-  return sql;
-}
-
-function downloadBackup(backup: any) {
-  
-}
+function downloadBackup(backup: any) {}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 Bytes";
@@ -662,12 +502,7 @@ function formatBytes(bytes: number): string {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
-
-const savedHistory = localStorage.getItem("tigerbeetle_backup_history");
-if (savedHistory) {
-  try {
-    backupHistory.value = JSON.parse(savedHistory);
-  } catch (e) {
-  }
-}
+onMounted(() => {
+  loadBackupHistory();
+});
 </script>

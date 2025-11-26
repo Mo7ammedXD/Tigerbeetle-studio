@@ -28,8 +28,8 @@ const api = {
     return ipcRenderer.invoke('create-account', data);
   },
 
-  getAccounts: () => {
-    return ipcRenderer.invoke('get-accounts');
+  getAccounts: (limit, offset) => {
+    return ipcRenderer.invoke('get-accounts', limit, offset);
   },
 
   deleteAccount: (id) => {
@@ -41,8 +41,17 @@ const api = {
     return ipcRenderer.invoke('create-transfer', data);
   },
 
-  getTransfers: () => {
-    return ipcRenderer.invoke('get-transfers');
+  getTransfers: (limit, offset) => {
+    return ipcRenderer.invoke('get-transfers', limit, offset);
+  },
+
+  // Import/Export
+  importAccountsFromJson: (filePath) => {
+    return ipcRenderer.invoke('import-accounts-from-json', filePath);
+  },
+
+  lookupAccountsByIds: (ids) => {
+    return ipcRenderer.invoke('lookup-accounts-by-ids', ids);
   }
 };
 

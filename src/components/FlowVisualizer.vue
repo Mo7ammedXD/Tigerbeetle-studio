@@ -33,7 +33,6 @@
       </v-alert>
 
       <v-card-text>
-        
         <v-row class="mb-4">
           <v-col cols="12" md="3">
             <v-select
@@ -45,15 +44,16 @@
               @update:model-value="loadFlowData"
             />
           </v-col>
-          <v-col cols="12" md="3">
+          <v-col cols="12" md="4">
             <v-text-field
               v-model="focusAccount"
-              label="Focus Account"
+              label="Search Account (Required)"
               variant="outlined"
               density="comfortable"
               clearable
-              hint="Enter account ID or alias"
+              hint="Enter account ID or alias to visualize"
               persistent-hint
+              :rules="[(v) => !!v || 'Account ID or alias is required']"
             />
           </v-col>
           <v-col cols="12" md="2">
@@ -64,7 +64,7 @@
               variant="outlined"
               density="comfortable"
               :min="1"
-              :max="5"
+              :max="3"
             />
           </v-col>
           <v-col cols="12" md="2">
@@ -77,11 +77,18 @@
             />
           </v-col>
           <v-col cols="12" md="2">
-            <v-btn color="primary" block @click="applyFilters"> Apply </v-btn>
+            <v-btn
+              color="primary"
+              block
+              @click="applyFilters"
+              :disabled="!focusAccount || loading"
+              :loading="loading"
+            >
+              Search
+            </v-btn>
           </v-col>
         </v-row>
 
-        
         <v-card variant="outlined" class="mb-4">
           <div ref="canvasContainer" class="flow-canvas-container">
             <canvas
@@ -94,7 +101,6 @@
           </div>
         </v-card>
 
-        
         <v-row>
           <v-col cols="12" md="6">
             <v-card variant="outlined">
@@ -167,7 +173,6 @@
           </v-col>
         </v-row>
 
-        
         <v-card v-if="selectedNode" variant="outlined" class="mt-4">
           <v-card-title>Account Details</v-card-title>
           <v-card-text>
@@ -181,12 +186,22 @@
                   {{ selectedNode.id }}
                 </div>
 
+                <div class="text-caption text-grey mb-1">Ledger</div>
+                <div class="text-body-1 mb-3">
+                  {{ getLedgerName(selectedNode.ledger) }}
+                </div>
+
                 <div class="text-caption text-grey mb-1">Balance</div>
                 <v-chip
                   :color="getBalanceColor(selectedNode.balance)"
                   size="small"
                 >
-                  {{ formatAmount(selectedNode.balance) }}
+                  {{
+                    formatAmountWithLedger(
+                      selectedNode.balance,
+                      selectedNode.ledger
+                    )
+                  }}
                 </v-chip>
               </v-col>
               <v-col cols="12" md="6">
@@ -206,21 +221,47 @@
 
                 <div class="text-caption text-grey mb-1">Total Volume</div>
                 <div class="text-body-1">
-                  {{ formatAmount(selectedNode.totalVolume) }}
+                  {{
+                    formatAmountWithLedger(
+                      selectedNode.totalVolume,
+                      selectedNode.ledger
+                    )
+                  }}
                 </div>
               </v-col>
             </v-row>
           </v-card-text>
         </v-card>
 
-        
-        <v-alert type="info" variant="tonal" class="mt-4">
+        <v-alert
+          v-if="nodes.length === 0 && !loading"
+          type="info"
+          variant="tonal"
+          class="mt-4"
+        >
+          <div class="text-subtitle-2 mb-2">💡 How to Use</div>
+          <ul class="text-body-2">
+            <li>
+              Enter an <strong>Account ID or Alias</strong> in the search field
+            </li>
+            <li>
+              Click <strong>Search</strong> to visualize transfers for that
+              account
+            </li>
+            <li>Adjust filters to refine the visualization</li>
+            <li>
+              <strong>Performance:</strong> Only fetches data for the searched
+              account
+            </li>
+          </ul>
+        </v-alert>
+
+        <v-alert v-else type="info" variant="tonal" class="mt-4">
           <div class="text-subtitle-2 mb-2">Controls</div>
           <ul class="text-body-2">
             <li><strong>Click & Drag:</strong> Pan the view</li>
             <li><strong>Mouse Wheel:</strong> Zoom in/out</li>
             <li><strong>Click Node:</strong> View account details</li>
-            <li><strong>Double Click:</strong> Focus on account</li>
           </ul>
         </v-alert>
       </v-card-text>
@@ -229,6 +270,7 @@
 </template>
 
 <script setup lang="ts">
+import { useCurrency } from "@/composables/useCurrency";
 import { formatTBAmount, isPositiveTBAmount } from "@/utils/bigint";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 
@@ -238,10 +280,13 @@ interface Props {
 
 const props = defineProps<Props>();
 
+const { getCurrencyForLedger, getLedgerName } = useCurrency();
+
 interface FlowNode {
   id: string;
   alias: string;
   balance: string;
+  ledger: number;
   x: number;
   y: number;
   incomingCount: number;
@@ -285,7 +330,6 @@ const flowTypes = [
   { title: "Circular Flows", value: "circular" },
 ];
 
-
 let ctx: CanvasRenderingContext2D | null = null;
 let scale = 1;
 let offsetX = 0;
@@ -297,8 +341,11 @@ let lastMouseY = 0;
 watch(
   () => props.isConnected,
   (connected) => {
-    if (connected) {
-      loadFlowData();
+    if (!connected) {
+      nodes.value = [];
+      edges.value = [];
+      selectedNode.value = null;
+      error.value = null;
     }
   }
 );
@@ -308,10 +355,6 @@ onMounted(() => {
     ctx = flowCanvas.value.getContext("2d");
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
-  }
-
-  if (props.isConnected) {
-    loadFlowData();
   }
 });
 
@@ -330,15 +373,23 @@ function resizeCanvas() {
 }
 
 async function loadFlowData() {
-  if (!props.isConnected) return;
+  if (!props.isConnected) {
+    error.value = "Not connected to TigerBeetle";
+    return;
+  }
+
+  if (!focusAccount.value) {
+    error.value = "Please enter an account ID or alias to search";
+    return;
+  }
 
   loading.value = true;
   error.value = null;
 
   try {
     const [accountsResult, transfersResult] = await Promise.all([
-      window.tigerBeetleApi.getAccounts(1000, 0),
-      window.tigerBeetleApi.getTransfers(1000, 0),
+      window.tigerBeetleApi.getAccounts(100, 0),
+      window.tigerBeetleApi.getTransfers(500, 0),
     ]);
 
     if (accountsResult.success && transfersResult.success) {
@@ -373,7 +424,6 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
   const nodeMap = new Map<string, FlowNode>();
   const edgeList: FlowEdge[] = [];
 
-  
   let filteredTransfers = transfers;
   if (focusAccount.value) {
     filteredTransfers = transfers.filter(
@@ -391,18 +441,17 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
     );
   }
 
-  
   filteredTransfers.forEach((transfer) => {
     const debitId = transfer.debit_account_id;
     const creditId = transfer.credit_account_id;
 
-    
     if (!nodeMap.has(debitId)) {
       const account = accountMap.get(debitId);
       nodeMap.set(debitId, {
         id: debitId,
         alias: account?.alias || debitId.substring(0, 12),
         balance: account?.balance || "0",
+        ledger: account?.ledger || 0,
         x: 0,
         y: 0,
         incomingCount: 0,
@@ -418,6 +467,7 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
         id: creditId,
         alias: account?.alias || creditId.substring(0, 12),
         balance: account?.balance || "0",
+        ledger: account?.ledger || 0,
         x: 0,
         y: 0,
         incomingCount: 0,
@@ -427,7 +477,6 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
       });
     }
 
-    
     const debitNode = nodeMap.get(debitId)!;
     const creditNode = nodeMap.get(creditId)!;
     debitNode.outgoingCount++;
@@ -439,7 +488,6 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
       BigInt(creditNode.totalVolume) + amount
     ).toString();
 
-    
     edgeList.push({
       from: debitId,
       to: creditId,
@@ -448,7 +496,6 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
     });
   });
 
-  
   nodeMap.forEach((node) => {
     if (node.outgoingCount > 0 && node.incomingCount === 0) {
       node.type = "source";
@@ -457,14 +504,12 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
     }
   });
 
-  
   const nodeList = Array.from(nodeMap.values());
   layoutNodes(nodeList);
 
   nodes.value = nodeList;
   edges.value = edgeList;
 
-  
   const totalFlow = edgeList.reduce(
     (sum, e) => sum + BigInt(e.amount),
     BigInt(0)
@@ -486,7 +531,6 @@ function layoutNodes(nodeList: FlowNode[]) {
   const centerY = height / 2;
   const radius = Math.min(width, height) / 3;
 
-  
   nodeList.forEach((node, index) => {
     const angle = (index / nodeList.length) * 2 * Math.PI;
     node.x = centerX + radius * Math.cos(angle);
@@ -500,15 +544,12 @@ function renderFlow() {
   const width = flowCanvas.value.width;
   const height = flowCanvas.value.height;
 
-  
   ctx.clearRect(0, 0, width, height);
 
-  
   ctx.save();
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 
-  
   edges.value.forEach((edge) => {
     const fromNode = nodes.value.find((n) => n.id === edge.from);
     const toNode = nodes.value.find((n) => n.id === edge.to);
@@ -524,12 +565,10 @@ function renderFlow() {
       ctx.lineWidth = lineWidth;
       ctx.stroke();
 
-      
       drawArrow(ctx, fromNode.x, fromNode.y, toNode.x, toNode.y);
     }
   });
 
-  
   nodes.value.forEach((node) => {
     const color = getNodeColor(node.type);
     const radius = 20;
@@ -542,7 +581,6 @@ function renderFlow() {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    
     ctx.fillStyle = "#000";
     ctx.font = "12px sans-serif";
     ctx.textAlign = "center";
@@ -592,7 +630,6 @@ function handleMouseDown(event: MouseEvent) {
   lastMouseX = event.clientX;
   lastMouseY = event.clientY;
 
-  
   const rect = flowCanvas.value?.getBoundingClientRect();
   if (rect) {
     const x = (event.clientX - rect.left - offsetX) / scale;
@@ -640,6 +677,10 @@ function handleWheel(event: WheelEvent) {
 }
 
 function applyFilters() {
+  if (!focusAccount.value) {
+    error.value = "Please enter an account ID or alias to search";
+    return;
+  }
   loadFlowData();
 }
 
@@ -655,6 +696,11 @@ function toggleFullscreen() {
 
 function formatAmount(value: string): string {
   return formatTBAmount(value);
+}
+
+function formatAmountWithLedger(value: string, ledgerId: number): string {
+  const currency = getCurrencyForLedger(ledgerId);
+  return formatTBAmount(value, currency);
 }
 
 function getBalanceColor(balance: string): string {
