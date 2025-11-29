@@ -5,19 +5,29 @@
         <div class="d-flex align-center">
           <v-icon icon="mdi-bank-transfer" class="mr-2" color="primary" />
           <span class="text-h5">Transfers</span>
-          <v-chip class="ml-3" size="small" color="info">
-            {{ totalItems }} total
-          </v-chip>
         </div>
 
-        <div>
+        <div class="d-flex gap-2">
           <v-btn
             icon="mdi-refresh"
             variant="text"
             @click="loadTransfers"
             :loading="loading"
-            class="mr-2"
           />
+          <v-btn
+            :icon="showFilters ? 'mdi-filter-off' : 'mdi-filter'"
+            variant="text"
+            @click="showFilters = !showFilters"
+            :color="hasActiveFilters ? 'primary' : undefined"
+          >
+            <v-icon>{{ showFilters ? "mdi-filter-off" : "mdi-filter" }}</v-icon>
+            <v-badge
+              v-if="hasActiveFilters && !showFilters"
+              color="primary"
+              :content="activeFiltersCount"
+              inline
+            />
+          </v-btn>
           <v-btn
             color="primary"
             prepend-icon="mdi-plus"
@@ -28,6 +38,141 @@
           </v-btn>
         </div>
       </v-card-title>
+
+      <!-- Filter Panel -->
+      <v-expand-transition>
+        <div v-show="showFilters">
+          <v-divider />
+          <v-card-text class="pa-4">
+            <div class="d-flex flex-wrap gap-4">
+              <!-- Date Range Filter -->
+              <div
+                class="flex-grow-1"
+                style="min-width: 250px; max-width: 400px"
+              >
+                <v-label class="text-caption font-weight-bold mb-2">
+                  <v-icon size="small" class="mr-1">mdi-calendar-range</v-icon>
+                  Date Range
+                </v-label>
+                <div class="d-flex gap-2">
+                  <v-text-field
+                    v-model="dateRange.start"
+                    type="date"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    placeholder="Start date"
+                    clearable
+                  />
+                  <v-text-field
+                    v-model="dateRange.end"
+                    type="date"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    placeholder="End date"
+                    clearable
+                  />
+                </div>
+              </div>
+
+              <!-- Ledger Filter -->
+              <div style="min-width: 150px">
+                <v-label class="text-caption font-weight-bold mb-2">
+                  <v-icon size="small" class="mr-1"
+                    >mdi-book-open-variant</v-icon
+                  >
+                  Ledger
+                </v-label>
+                <v-text-field
+                  v-model.number="filters.ledger"
+                  type="number"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  placeholder="All ledgers"
+                  clearable
+                />
+              </div>
+
+              <!-- Code Filter -->
+              <div style="min-width: 150px">
+                <v-label class="text-caption font-weight-bold mb-2">
+                  <v-icon size="small" class="mr-1">mdi-code-tags</v-icon>
+                  Code
+                </v-label>
+                <v-text-field
+                  v-model.number="filters.code"
+                  type="number"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  placeholder="All codes"
+                  clearable
+                />
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="d-flex align-end gap-2">
+                <v-btn
+                  color="primary"
+                  variant="flat"
+                  @click="applyFilters"
+                  prepend-icon="mdi-filter-check"
+                >
+                  Apply
+                </v-btn>
+                <v-btn
+                  variant="outlined"
+                  @click="clearFilters"
+                  prepend-icon="mdi-filter-off"
+                >
+                  Clear
+                </v-btn>
+              </div>
+            </div>
+
+            <!-- Active Filters Chips -->
+            <div v-if="hasActiveFilters" class="mt-3 d-flex flex-wrap gap-2">
+              <v-chip
+                v-if="dateRange.start || dateRange.end"
+                size="small"
+                closable
+                @click:close="clearDateRange"
+              >
+                <v-icon start size="small">mdi-calendar</v-icon>
+                {{ formatDateRangeChip() }}
+              </v-chip>
+              <v-chip
+                v-if="filters.ledger"
+                size="small"
+                closable
+                @click:close="
+                  filters.ledger = undefined;
+                  applyFilters();
+                "
+              >
+                <v-icon start size="small">mdi-book-open-variant</v-icon>
+                Ledger: {{ filters.ledger }}
+              </v-chip>
+              <v-chip
+                v-if="filters.code"
+                size="small"
+                closable
+                @click:close="
+                  filters.code = undefined;
+                  applyFilters();
+                "
+              >
+                <v-icon start size="small">mdi-code-tags</v-icon>
+                Code: {{ filters.code }}
+              </v-chip>
+            </div>
+          </v-card-text>
+        </div>
+      </v-expand-transition>
+
+      <v-divider />
 
       <v-alert
         v-if="error"
@@ -186,34 +331,55 @@
 
       <v-card-actions
         v-if="transfers.length > 0"
-        class="d-flex justify-space-between align-center pa-4"
+        class="d-flex flex-column flex-sm-row justify-space-between align-center pa-4 gap-3"
       >
-        <div class="text-caption text-grey">
-          Showing {{ (page - 1) * itemsPerPage + 1 }} to
-          {{ Math.min(page * itemsPerPage, totalItems) }} of {{ totalItems }}
-          transfers
+        <div class="d-flex align-center gap-2">
+          <v-icon size="small" color="grey">mdi-information-outline</v-icon>
+          <span class="text-body-2">
+            <strong>{{ currentCount }}</strong> transfers
+            <v-chip
+              v-if="hasMore"
+              size="x-small"
+              color="primary"
+              variant="flat"
+              class="ml-2"
+            >
+              More available
+            </v-chip>
+          </span>
         </div>
 
-        <div class="d-flex align-center">
-          <v-select
-            v-model="itemsPerPage"
-            :items="[25, 50, 100, 200]"
-            label="Per page"
-            density="compact"
-            variant="outlined"
-            hide-details
-            style="max-width: 120px"
-            @update:model-value="onItemsPerPageChange"
-          />
+        <div class="d-flex align-center gap-3">
+          <div class="d-flex align-center gap-2">
+            <v-icon size="small">mdi-table-row</v-icon>
+            <v-select
+              v-model="itemsPerPage"
+              :items="[25, 50, 100, 200]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 90px"
+              @update:model-value="onItemsPerPageChange"
+            />
+          </div>
 
-          <v-pagination
-            v-model="page"
-            :length="Math.ceil(totalItems / itemsPerPage)"
-            :total-visible="5"
-            size="small"
-            class="ml-4"
-            @update:model-value="onPageChange"
-          />
+          <v-divider vertical class="mx-2" />
+
+          <v-btn-group variant="outlined" divided>
+            <v-btn
+              :disabled="!hasPrevious || cursorHistory.length === 0"
+              size="small"
+              @click="onPreviousPage"
+            >
+              <v-icon>mdi-chevron-left</v-icon>
+              <span class="d-none d-sm-inline ml-1">Previous</span>
+            </v-btn>
+
+            <v-btn :disabled="!hasMore" size="small" @click="onNextPage">
+              <span class="d-none d-sm-inline mr-1">Next</span>
+              <v-icon>mdi-chevron-right</v-icon>
+            </v-btn>
+          </v-btn-group>
         </div>
       </v-card-actions>
     </v-card>
@@ -229,7 +395,7 @@
 import { useCurrency } from "@/composables/useCurrency";
 import type { TBTransfer } from "@/types/tigerbeetle";
 import { formatTBAmount, formatTBTimestamp } from "@/utils/bigint";
-import { onActivated, onMounted, ref, watch } from "vue";
+import { computed, onActivated, onMounted, ref, watch } from "vue";
 import CreateTransferModal from "./CreateTransferModal.vue";
 
 const { getCurrencyForLedger, loadCurrency } = useCurrency();
@@ -248,9 +414,45 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const showCreateModal = ref(false);
 const expanded = ref<string[]>([]);
-const page = ref(1);
 const itemsPerPage = ref(50);
-const totalItems = ref(0);
+const currentCursor = ref<string | null>(null);
+const cursorHistory = ref<string[]>([]); // Stack for previous page cursors
+const hasMore = ref(false);
+const hasPrevious = ref(false);
+const currentCount = ref(0);
+const showFilters = ref(false);
+
+// Date range filter (user-friendly format)
+const dateRange = ref({
+  start: "" as string,
+  end: "" as string,
+});
+
+// Timestamp range filters (for API)
+const filters = ref({
+  ledger: undefined as number | undefined,
+  code: undefined as number | undefined,
+  timestamp_min: undefined as string | undefined,
+  timestamp_max: undefined as string | undefined,
+});
+
+// Computed properties for filter UI
+const hasActiveFilters = computed(() => {
+  return !!(
+    dateRange.value.start ||
+    dateRange.value.end ||
+    filters.value.ledger ||
+    filters.value.code
+  );
+});
+
+const activeFiltersCount = computed(() => {
+  let count = 0;
+  if (dateRange.value.start || dateRange.value.end) count++;
+  if (filters.value.ledger) count++;
+  if (filters.value.code) count++;
+  return count;
+});
 
 const headers = [
   { title: "ID", key: "id", sortable: false },
@@ -263,28 +465,37 @@ const headers = [
   { title: "Date", key: "created_at", sortable: true },
 ];
 
-async function loadTransfers() {
+async function loadTransfers(direction: "next" | "prev" = "next") {
   if (!props.isConnected) return;
 
   loadCurrency();
   loading.value = true;
   error.value = null;
   try {
-    const offset = (page.value - 1) * itemsPerPage.value;
-    const result = await window.tigerBeetleApi.getTransfers(
-      itemsPerPage.value,
-      offset
+    // Clean filters to remove undefined values (IPC can't clone undefined)
+    const cleanFilters = Object.fromEntries(
+      Object.entries(filters.value).filter(([_, v]) => v !== undefined)
     );
 
-    if (result.success) {
-      const data = result.data;
+    const result = await window.tigerBeetleApi.getTransfers(
+      itemsPerPage.value,
+      currentCursor.value,
+      direction,
+      Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined
+    );
 
-      if (data && typeof data === "object" && "data" in data) {
-        transfers.value = data.data || [];
-        totalItems.value = data.total || 0;
-      } else {
-        transfers.value = (data as any[]) || [];
-        totalItems.value = transfers.value.length;
+    if (result.success && result.data) {
+      const data = result.data;
+      transfers.value = data.data || [];
+      hasMore.value = data.hasMore || false;
+      hasPrevious.value = data.hasPrevious || false;
+      currentCount.value = data.count || 0;
+
+      // Update cursor for next page
+      if (direction === "next" && data.nextCursor) {
+        currentCursor.value = data.nextCursor;
+      } else if (direction === "prev" && data.prevCursor) {
+        currentCursor.value = data.prevCursor;
       }
     } else {
       error.value = result.error || "Failed to load transfers";
@@ -298,15 +509,74 @@ async function loadTransfers() {
   }
 }
 
-function onPageChange(newPage: number) {
-  page.value = newPage;
-  loadTransfers();
+function onNextPage() {
+  if (!hasMore.value) return;
+  if (currentCursor.value) {
+    cursorHistory.value.push(currentCursor.value);
+  }
+  loadTransfers("next");
+}
+
+function onPreviousPage() {
+  if (!hasPrevious.value || cursorHistory.value.length === 0) return;
+  currentCursor.value = cursorHistory.value.pop() || null;
+  loadTransfers("prev");
 }
 
 function onItemsPerPageChange(newItemsPerPage: number) {
   itemsPerPage.value = newItemsPerPage;
-  page.value = 1;
+  currentCursor.value = null;
+  cursorHistory.value = [];
   loadTransfers();
+}
+
+function applyFilters() {
+  // Convert date range to timestamps
+  if (dateRange.value.start) {
+    const startDate = new Date(dateRange.value.start);
+    filters.value.timestamp_min = (startDate.getTime() * 1000000).toString(); // Convert to nanoseconds
+  } else {
+    filters.value.timestamp_min = undefined;
+  }
+
+  if (dateRange.value.end) {
+    const endDate = new Date(dateRange.value.end);
+    endDate.setHours(23, 59, 59, 999); // End of day
+    filters.value.timestamp_max = (endDate.getTime() * 1000000).toString(); // Convert to nanoseconds
+  } else {
+    filters.value.timestamp_max = undefined;
+  }
+
+  currentCursor.value = null;
+  cursorHistory.value = [];
+  loadTransfers();
+}
+
+function clearFilters() {
+  dateRange.value.start = "";
+  dateRange.value.end = "";
+  filters.value.ledger = undefined;
+  filters.value.code = undefined;
+  filters.value.timestamp_min = undefined;
+  filters.value.timestamp_max = undefined;
+  applyFilters();
+}
+
+function clearDateRange() {
+  dateRange.value.start = "";
+  dateRange.value.end = "";
+  applyFilters();
+}
+
+function formatDateRangeChip(): string {
+  if (dateRange.value.start && dateRange.value.end) {
+    return `${dateRange.value.start} to ${dateRange.value.end}`;
+  } else if (dateRange.value.start) {
+    return `From ${dateRange.value.start}`;
+  } else if (dateRange.value.end) {
+    return `Until ${dateRange.value.end}`;
+  }
+  return "";
 }
 
 function formatAmount(value: string | number, ledger?: number): string {

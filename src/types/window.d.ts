@@ -40,6 +40,15 @@ export interface PaginatedResponse<T> {
   offset: number;
 }
 
+export interface CursorPaginatedResponse<T> {
+  data: T[];
+  nextCursor: string | null;
+  prevCursor: string | null;
+  hasMore: boolean;
+  hasPrevious: boolean;
+  count: number;
+}
+
 export interface QueryAccountsFilter {
   ledger?: number;
   code?: number;
@@ -69,14 +78,28 @@ export interface TigerBeetleApi {
   createAccount: (data: AccountData) => Promise<ApiResponse<{ id: string }>>;
   getAccounts: (
     limit?: number,
-    offset?: number
-  ) => Promise<ApiResponse<PaginatedResponse<any> | any[]>>;
+    cursor?: string | null,
+    direction?: "next" | "prev",
+    filters?: {
+      ledger?: number;
+      code?: number;
+      timestamp_min?: string;
+      timestamp_max?: string;
+    }
+  ) => Promise<ApiResponse<CursorPaginatedResponse<any>>>;
   deleteAccount: (id: string) => Promise<ApiResponse>;
   createTransfer: (data: TransferData) => Promise<ApiResponse<{ id: string }>>;
   getTransfers: (
     limit?: number,
-    offset?: number
-  ) => Promise<ApiResponse<PaginatedResponse<any> | any[]>>;
+    cursor?: string | null,
+    direction?: "next" | "prev",
+    filters?: {
+      ledger?: number;
+      code?: number;
+      timestamp_min?: string;
+      timestamp_max?: string;
+    }
+  ) => Promise<ApiResponse<CursorPaginatedResponse<any>>>;
   importAccountsFromJson: (filePath: string) => Promise<ApiResponse<any>>;
   lookupAccountsByIds: (ids: string[]) => Promise<ApiResponse<any[]>>;
   lookupTransfersByIds: (ids: string[]) => Promise<ApiResponse<any[]>>;

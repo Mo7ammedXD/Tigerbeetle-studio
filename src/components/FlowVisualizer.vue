@@ -388,8 +388,8 @@ async function loadFlowData() {
 
   try {
     const [accountsResult, transfersResult] = await Promise.all([
-      window.tigerBeetleApi.getAccounts(100, 0),
-      window.tigerBeetleApi.getTransfers(500, 0),
+      window.tigerBeetleApi.getAccounts(100, null, "next"),
+      window.tigerBeetleApi.getTransfers(500, null, "next"),
     ]);
 
     if (accountsResult.success && transfersResult.success) {

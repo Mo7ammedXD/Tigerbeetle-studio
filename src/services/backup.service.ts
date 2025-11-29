@@ -29,21 +29,12 @@ export class BackupService {
       };
 
       onProgress?.(20, "Fetching accounts...");
-      const accountsResult = await window.tigerBeetleApi.getAccounts(100000, 0);
-      if (accountsResult.success) {
-        backup.accounts = this.extractData(accountsResult.data);
-        backup.metadata.accountsCount = backup.accounts.length;
-      }
+      backup.accounts = await this.fetchAllAccounts(onProgress);
+      backup.metadata.accountsCount = backup.accounts.length;
 
-      onProgress?.(40, "Fetching transfers...");
-      const transfersResult = await window.tigerBeetleApi.getTransfers(
-        100000,
-        0
-      );
-      if (transfersResult.success) {
-        backup.transfers = this.extractData(transfersResult.data);
-        backup.metadata.transfersCount = backup.transfers.length;
-      }
+      onProgress?.(50, "Fetching transfers...");
+      backup.transfers = await this.fetchAllTransfers(onProgress);
+      backup.metadata.transfersCount = backup.transfers.length;
 
       if (options.includeConfig) {
         onProgress?.(60, "Including configuration...");
@@ -123,17 +114,105 @@ export class BackupService {
       history.unshift(item);
       const trimmed = history.slice(0, this.MAX_HISTORY);
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(trimmed));
-    } catch (error) {
-
-    }
+    } catch (error) {}
   }
 
   static clearHistory(): void {
     try {
       localStorage.removeItem(this.STORAGE_KEY);
-    } catch (error) {
+    } catch (error) {}
+  }
 
+  /**
+   * Fetch all accounts using cursor-based pagination
+   */
+  private static async fetchAllAccounts(
+    onProgress?: ProgressCallback
+  ): Promise<any[]> {
+    const allAccounts: any[] = [];
+    let cursor: string | null = null;
+    let hasMore = true;
+    const pageSize = 1000;
+    let pageCount = 0;
+
+    while (hasMore) {
+      const result = await window.tigerBeetleApi.getAccounts(
+        pageSize,
+        cursor,
+        "next"
+      );
+
+      if (result.success && result.data) {
+        const data = result.data;
+        const accounts = data.data || [];
+        allAccounts.push(...accounts);
+
+        hasMore = data.hasMore || false;
+        cursor = data.nextCursor || null;
+        pageCount++;
+
+        const progress = 20 + Math.min(30, (pageCount * pageSize) / 10000);
+        onProgress?.(
+          Math.round(progress),
+          `Fetching accounts... (${allAccounts.length} loaded)`
+        );
+
+        if (pageCount > 10000) {
+          console.warn("Reached maximum page limit for accounts");
+          break;
+        }
+      } else {
+        break;
+      }
     }
+
+    return allAccounts;
+  }
+
+  /**
+   * Fetch all transfers using cursor-based pagination
+   */
+  private static async fetchAllTransfers(
+    onProgress?: ProgressCallback
+  ): Promise<any[]> {
+    const allTransfers: any[] = [];
+    let cursor: string | null = null;
+    let hasMore = true;
+    const pageSize = 1000;
+    let pageCount = 0;
+
+    while (hasMore) {
+      const result = await window.tigerBeetleApi.getTransfers(
+        pageSize,
+        cursor,
+        "next"
+      );
+
+      if (result.success && result.data) {
+        const data = result.data;
+        const transfers = data.data || [];
+        allTransfers.push(...transfers);
+
+        hasMore = data.hasMore || false;
+        cursor = data.nextCursor || null;
+        pageCount++;
+
+        const progress = 50 + Math.min(30, (pageCount * pageSize) / 10000);
+        onProgress?.(
+          Math.round(progress),
+          `Fetching transfers... (${allTransfers.length} loaded)`
+        );
+
+        if (pageCount > 10000) {
+          console.warn("Reached maximum page limit for transfers");
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    return allTransfers;
   }
 
   private static extractData<T>(data: any): T[] {

@@ -66,8 +66,24 @@ const api = {
     return ipcRenderer.invoke("create-account", data);
   },
 
-  getAccounts: (limit?: number, offset?: number): Promise<ApiResponse<any>> => {
-    return ipcRenderer.invoke("get-accounts", limit, offset);
+  getAccounts: (
+    limit?: number,
+    cursor?: string | null,
+    direction?: "next" | "prev",
+    filters?: {
+      ledger?: number;
+      code?: number;
+      timestamp_min?: string;
+      timestamp_max?: string;
+    }
+  ): Promise<ApiResponse<any>> => {
+    return ipcRenderer.invoke(
+      "get-accounts",
+      limit,
+      cursor,
+      direction,
+      filters
+    );
   },
 
   deleteAccount: (id: string): Promise<ApiResponse> => {
@@ -83,9 +99,22 @@ const api = {
 
   getTransfers: (
     limit?: number,
-    offset?: number
+    cursor?: string | null,
+    direction?: "next" | "prev",
+    filters?: {
+      ledger?: number;
+      code?: number;
+      timestamp_min?: string;
+      timestamp_max?: string;
+    }
   ): Promise<ApiResponse<any>> => {
-    return ipcRenderer.invoke("get-transfers", limit, offset);
+    return ipcRenderer.invoke(
+      "get-transfers",
+      limit,
+      cursor,
+      direction,
+      filters
+    );
   },
 
   lookupTransfersByIds: (ids: string[]): Promise<ApiResponse<any[]>> => {

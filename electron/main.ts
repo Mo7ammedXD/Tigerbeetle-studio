@@ -343,7 +343,8 @@ async function queryAccountsFromTigerBeetle(
   ledger?: number,
   code?: number,
   reversed: boolean = false,
-  timestamp_min: bigint = 0n
+  timestamp_min: bigint = 0n,
+  timestamp_max: bigint = 0n
 ) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -357,7 +358,7 @@ async function queryAccountsFromTigerBeetle(
       ledger: ledger || 0,
       code: code || 0,
       timestamp_min: timestamp_min,
-      timestamp_max: 0n,
+      timestamp_max: timestamp_max,
       limit: limit,
       flags: reversed ? 1 : 0,
       reserved: new Uint8Array(6),
@@ -530,25 +531,68 @@ async function fetchAllTransfersFromTigerBeetle(
   }
 }
 
-async function getAccounts(limit: number = 100, offset: number = 0) {
+async function getAccounts(
+  limit: number = 50,
+  cursor: string | null = null,
+  direction: "next" | "prev" = "next",
+  filters?: {
+    ledger?: number;
+    code?: number;
+    timestamp_min?: string;
+    timestamp_max?: string;
+  }
+) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
   }
 
   try {
-    // OPTIMIZED: Direct pagination using TigerBeetle query API
-    // Instead of fetching ALL accounts, fetch only what we need
-    const pageSize = Math.min(limit, 8189); // TigerBeetle max batch size
+    // Fetch one extra item to determine if there are more results
+    const fetchLimit = limit + 1;
 
-    // For now, we'll still use fetchAll but with a TODO to implement proper query
-    // This requires TigerBeetle client update to support queryAccounts with pagination
-    const allAccounts = await fetchAllAccountsFromTigerBeetle(1);
-    const totalCount = allAccounts.length;
+    // Parse cursor (timestamp) or use defaults
+    let timestamp_min = 0n;
+    let timestamp_max = 0n;
+    const reversed = direction === "prev";
 
-    // Slice for current page
-    const paginatedAccounts = allAccounts.slice(offset, offset + limit);
+    if (cursor) {
+      const cursorTimestamp = BigInt(cursor);
+      if (direction === "next") {
+        // For next page, get records with timestamp < cursor (reversed order)
+        timestamp_max = cursorTimestamp - 1n;
+      } else {
+        // For previous page, get records with timestamp > cursor (forward order)
+        timestamp_min = cursorTimestamp + 1n;
+      }
+    }
 
-    const result = paginatedAccounts.map((tbAcc: any) => {
+    // Apply user filters if provided
+    if (filters?.timestamp_min) {
+      timestamp_min = BigInt(filters.timestamp_min);
+    }
+    if (filters?.timestamp_max) {
+      timestamp_max = BigInt(filters.timestamp_max);
+    }
+
+    // Query accounts using TigerBeetle's native query API
+    const accounts = await queryAccountsFromTigerBeetle(
+      fetchLimit,
+      filters?.ledger || 1,
+      filters?.code,
+      !reversed, // TigerBeetle's reversed flag (true = newest first)
+      timestamp_min,
+      timestamp_max
+    );
+
+    // Check if there are more results
+    const hasMore = accounts.length > limit;
+    const hasPrevious = cursor !== null;
+
+    // Remove the extra item if we have more
+    const resultAccounts = hasMore ? accounts.slice(0, -1) : accounts;
+
+    // Map accounts to response format with aliases from local DB
+    const result = resultAccounts.map((tbAcc: any) => {
       const debits = tbAcc.debits_posted.toString();
       const credits = tbAcc.credits_posted.toString();
       const balance = (tbAcc.credits_posted - tbAcc.debits_posted).toString();
@@ -583,11 +627,20 @@ async function getAccounts(limit: number = 100, offset: number = 0) {
       };
     });
 
+    // Determine cursors for next/previous pages
+    const nextCursor =
+      hasMore && result.length > 0 ? result[result.length - 1].timestamp : null;
+
+    const prevCursor =
+      hasPrevious && result.length > 0 ? result[0].timestamp : null;
+
     return {
       data: result,
-      total: totalCount, // Use pre-calculated total
-      limit,
-      offset,
+      nextCursor,
+      prevCursor,
+      hasMore,
+      hasPrevious,
+      count: result.length,
     };
   } catch (error: any) {
     throw error;
@@ -870,21 +923,68 @@ async function createTransfer(data: TransferData) {
   }
 }
 
-async function getTransfers(limit: number = 100, offset: number = 0) {
+async function getTransfers(
+  limit: number = 50,
+  cursor: string | null = null,
+  direction: "next" | "prev" = "next",
+  filters?: {
+    ledger?: number;
+    code?: number;
+    timestamp_min?: string;
+    timestamp_max?: string;
+  }
+) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
   }
 
   try {
-    // OPTIMIZED: Direct pagination using TigerBeetle query API
-    // TODO: Implement proper server-side pagination when TigerBeetle client supports it
-    const allTransfers = await fetchAllTransfersFromTigerBeetle(1);
-    const totalCount = allTransfers.length;
+    // Fetch one extra item to determine if there are more results
+    const fetchLimit = limit + 1;
 
-    // Slice for current page
-    const paginatedTransfers = allTransfers.slice(offset, offset + limit);
+    // Parse cursor (timestamp) or use defaults
+    let timestamp_min = 0n;
+    let timestamp_max = 0n;
+    const reversed = direction === "next"; // For transfers, 'next' means older (reversed)
 
-    const result = paginatedTransfers.map((tbTransfer: any) => {
+    if (cursor) {
+      const cursorTimestamp = BigInt(cursor);
+      if (direction === "next") {
+        // For next page, get records with timestamp < cursor (older records)
+        timestamp_max = cursorTimestamp - 1n;
+      } else {
+        // For previous page, get records with timestamp > cursor (newer records)
+        timestamp_min = cursorTimestamp + 1n;
+      }
+    }
+
+    // Apply user filters if provided
+    if (filters?.timestamp_min) {
+      timestamp_min = BigInt(filters.timestamp_min);
+    }
+    if (filters?.timestamp_max) {
+      timestamp_max = BigInt(filters.timestamp_max);
+    }
+
+    // Query transfers using TigerBeetle's native query API
+    const transfers = await queryTransfersFromTigerBeetle(
+      fetchLimit,
+      filters?.ledger || 1,
+      filters?.code,
+      reversed,
+      timestamp_min,
+      timestamp_max
+    );
+
+    // Check if there are more results
+    const hasMore = transfers.length > limit;
+    const hasPrevious = cursor !== null;
+
+    // Remove the extra item if we have more
+    const resultTransfers = hasMore ? transfers.slice(0, -1) : transfers;
+
+    // Map transfers to response format with aliases from local DB
+    const result = resultTransfers.map((tbTransfer: any) => {
       let debitAlias = tbTransfer.debit_account_id.toString();
       let creditAlias = tbTransfer.credit_account_id.toString();
 
@@ -924,11 +1024,20 @@ async function getTransfers(limit: number = 100, offset: number = 0) {
       };
     });
 
+    // Determine cursors for next/previous pages
+    const nextCursor =
+      hasMore && result.length > 0 ? result[result.length - 1].timestamp : null;
+
+    const prevCursor =
+      hasPrevious && result.length > 0 ? result[0].timestamp : null;
+
     return {
       data: result,
-      total: totalCount, // Use pre-calculated total
-      limit,
-      offset,
+      nextCursor,
+      prevCursor,
+      hasMore,
+      hasPrevious,
+      count: result.length,
     };
   } catch (error: any) {
     throw error;
@@ -972,10 +1081,43 @@ function setupIpcHandlers() {
 
   ipcMain.handle(
     "get-accounts",
-    async (_event, limit?: number, offset?: number) => {
+    async (
+      _event,
+      limit?: number,
+      cursor?: string | null,
+      direction?: "next" | "prev",
+      filters?: {
+        ledger?: number;
+        code?: number;
+        timestamp_min?: string;
+        timestamp_max?: string;
+      }
+    ) => {
       try {
-        const result = await getAccounts(limit, offset);
-        return { success: true, data: result };
+        const cleanLimit = limit ?? 50;
+        const cleanCursor = cursor === undefined ? null : cursor;
+        const cleanDirection = direction ?? "next";
+        const cleanFilters = filters ?? undefined;
+
+        const result = await getAccounts(
+          cleanLimit,
+          cleanCursor,
+          cleanDirection,
+          cleanFilters
+        );
+
+        // Return plain serializable object
+        return {
+          success: true,
+          data: {
+            data: result.data,
+            nextCursor: result.nextCursor,
+            prevCursor: result.prevCursor,
+            hasMore: result.hasMore,
+            hasPrevious: result.hasPrevious,
+            count: result.count,
+          },
+        };
       } catch (error: any) {
         return { success: false, error: error.message };
       }
@@ -1050,10 +1192,44 @@ function setupIpcHandlers() {
 
   ipcMain.handle(
     "get-transfers",
-    async (_event, limit?: number, offset?: number) => {
+    async (
+      _event,
+      limit?: number,
+      cursor?: string | null,
+      direction?: "next" | "prev",
+      filters?: {
+        ledger?: number;
+        code?: number;
+        timestamp_min?: string;
+        timestamp_max?: string;
+      }
+    ) => {
       try {
-        const result = await getTransfers(limit, offset);
-        return { success: true, data: result };
+        // Clean up parameters to avoid undefined issues
+        const cleanLimit = limit ?? 50;
+        const cleanCursor = cursor === undefined ? null : cursor;
+        const cleanDirection = direction ?? "next";
+        const cleanFilters = filters ?? undefined;
+
+        const result = await getTransfers(
+          cleanLimit,
+          cleanCursor,
+          cleanDirection,
+          cleanFilters
+        );
+
+        // Return plain serializable object
+        return {
+          success: true,
+          data: {
+            data: result.data,
+            nextCursor: result.nextCursor,
+            prevCursor: result.prevCursor,
+            hasMore: result.hasMore,
+            hasPrevious: result.hasPrevious,
+            count: result.count,
+          },
+        };
       } catch (error: any) {
         return { success: false, error: error.message };
       }

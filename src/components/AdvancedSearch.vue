@@ -20,7 +20,6 @@
       </v-alert>
 
       <v-card-text>
-        
         <v-text-field
           v-model="searchQuery"
           label="Search across all data"
@@ -40,7 +39,6 @@
           </template>
         </v-text-field>
 
-        
         <v-expansion-panels v-model="panels" multiple class="mb-4">
           <v-expansion-panel value="options">
             <v-expansion-panel-title>
@@ -131,7 +129,6 @@
           </v-expansion-panel>
         </v-expansion-panels>
 
-        
         <v-tabs
           v-if="hasResults"
           v-model="activeTab"
@@ -147,9 +144,7 @@
           </v-tab>
         </v-tabs>
 
-        
         <v-window v-if="hasResults" v-model="activeTab">
-          
           <v-window-item value="all">
             <div class="mb-4">
               <v-chip color="success" class="mr-2">
@@ -160,7 +155,6 @@
               </v-chip>
             </div>
 
-            
             <div v-if="accountResults.length > 0" class="mb-4">
               <div class="text-subtitle-1 mb-2">Accounts</div>
               <v-list>
@@ -187,7 +181,6 @@
               </v-btn>
             </div>
 
-            
             <div v-if="transferResults.length > 0">
               <div class="text-subtitle-1 mb-2">Transfers</div>
               <v-list>
@@ -225,7 +218,6 @@
             </div>
           </v-window-item>
 
-          
           <v-window-item value="accounts">
             <v-data-table
               :headers="accountHeaders"
@@ -251,7 +243,6 @@
             </v-data-table>
           </v-window-item>
 
-          
           <v-window-item value="transfers">
             <v-data-table
               :headers="transferHeaders"
@@ -281,12 +272,10 @@
           </v-window-item>
         </v-window>
 
-        
         <v-alert v-else-if="searched && !searching" type="info" variant="tonal">
           No results found for "{{ searchQuery }}"
         </v-alert>
 
-        
         <v-card v-if="!searched" variant="outlined" class="mt-4">
           <v-card-title>Search Tips</v-card-title>
           <v-card-text>
@@ -386,17 +375,15 @@ async function executeSearch() {
   transferResults.value = [];
 
   try {
-    
     const [accountsResult, transfersResult] = await Promise.all([
       options.value.searchAccounts
-        ? window.tigerBeetleApi.getAccounts(10000, 0)
+        ? window.tigerBeetleApi.getAccounts(10000, null, "next")
         : Promise.resolve({ success: true, data: [] }),
       options.value.searchTransfers
-        ? window.tigerBeetleApi.getTransfers(10000, 0)
+        ? window.tigerBeetleApi.getTransfers(10000, null, "next")
         : Promise.resolve({ success: true, data: [] }),
     ]);
 
-    
     if (accountsResult.success && options.value.searchAccounts) {
       const data = accountsResult.data;
       const accounts =
@@ -404,7 +391,6 @@ async function executeSearch() {
       accountResults.value = searchInAccounts(accounts);
     }
 
-    
     if (transfersResult.success && options.value.searchTransfers) {
       const data = transfersResult.data;
       const transfers =
@@ -412,7 +398,6 @@ async function executeSearch() {
       transferResults.value = searchInTransfers(transfers);
     }
 
-    
     addToHistory({
       query: searchQuery.value,
       results: totalResults.value,
@@ -543,8 +528,7 @@ onMounted(() => {
   if (saved) {
     try {
       searchHistory.value = JSON.parse(saved);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 });
 </script>

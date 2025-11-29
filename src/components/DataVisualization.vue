@@ -421,8 +421,8 @@ async function loadData() {
 
   try {
     const [accountsResult, transfersResult] = await Promise.all([
-      window.tigerBeetleApi.getAccounts(100, 0),
-      window.tigerBeetleApi.getTransfers(100, 0),
+      window.tigerBeetleApi.getAccounts(100, null, "next"),
+      window.tigerBeetleApi.getTransfers(100, null, "next"),
     ]);
 
     if (accountsResult.success && transfersResult.success) {

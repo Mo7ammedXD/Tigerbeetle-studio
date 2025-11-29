@@ -65,10 +65,8 @@ import { ref } from "vue";
 const dialog = ref(false);
 
 const navigationShortcuts: KeyboardShortcut[] = [
-  { key: "1", ctrl: true, description: "Go to Dashboard", action: () => {} },
-  { key: "2", ctrl: true, description: "Go to Accounts", action: () => {} },
-  { key: "3", ctrl: true, description: "Go to Transfers", action: () => {} },
- 
+  { key: "1", ctrl: true, description: "Go to Accounts", action: () => {} },
+  { key: "2", ctrl: true, description: "Go to Transfers", action: () => {} },
 ];
 
 const actionShortcuts: KeyboardShortcut[] = [

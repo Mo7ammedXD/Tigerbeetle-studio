@@ -5,19 +5,29 @@
         <div class="d-flex align-center">
           <v-icon icon="mdi-account-multiple" class="mr-2" color="primary" />
           <span class="text-h5">Accounts</span>
-          <v-chip class="ml-3" size="small" color="info">
-            {{ totalItems }} total
-          </v-chip>
         </div>
 
-        <div>
+        <div class="d-flex gap-2">
           <v-btn
             icon="mdi-refresh"
             variant="text"
             @click="loadAccounts"
             :loading="loading"
-            class="mr-2"
           />
+          <v-btn
+            :icon="showFilters ? 'mdi-filter-off' : 'mdi-filter'"
+            variant="text"
+            @click="showFilters = !showFilters"
+            :color="hasActiveFilters ? 'primary' : undefined"
+          >
+            <v-icon>{{ showFilters ? "mdi-filter-off" : "mdi-filter" }}</v-icon>
+            <v-badge
+              v-if="hasActiveFilters && !showFilters"
+              color="primary"
+              :content="activeFiltersCount"
+              inline
+            />
+          </v-btn>
           <v-btn
             color="primary"
             prepend-icon="mdi-plus"
@@ -218,34 +228,55 @@
 
       <v-card-actions
         v-if="accounts.length > 0"
-        class="d-flex justify-space-between align-center pa-4"
+        class="d-flex flex-column flex-sm-row justify-space-between align-center pa-4 gap-3"
       >
-        <div class="text-caption text-grey">
-          Showing {{ (page - 1) * itemsPerPage + 1 }} to
-          {{ Math.min(page * itemsPerPage, totalItems) }} of {{ totalItems }}
-          accounts
+        <div class="d-flex align-center gap-2">
+          <v-icon size="small" color="grey">mdi-information-outline</v-icon>
+          <span class="text-body-2">
+            <strong>{{ currentCount }}</strong> accounts
+            <v-chip
+              v-if="hasMore"
+              size="x-small"
+              color="primary"
+              variant="flat"
+              class="ml-2"
+            >
+              More available
+            </v-chip>
+          </span>
         </div>
 
-        <div class="d-flex align-center">
-          <v-select
-            v-model="itemsPerPage"
-            :items="[25, 50, 100, 200]"
-            label="Per page"
-            density="compact"
-            variant="outlined"
-            hide-details
-            style="max-width: 120px"
-            @update:model-value="onItemsPerPageChange"
-          />
+        <div class="d-flex align-center gap-3">
+          <div class="d-flex align-center gap-2">
+            <v-icon size="small">mdi-table-row</v-icon>
+            <v-select
+              v-model="itemsPerPage"
+              :items="[25, 50, 100, 200]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 90px"
+              @update:model-value="onItemsPerPageChange"
+            />
+          </div>
 
-          <v-pagination
-            v-model="page"
-            :length="Math.ceil(totalItems / itemsPerPage)"
-            :total-visible="5"
-            size="small"
-            class="ml-4"
-            @update:model-value="onPageChange"
-          />
+          <v-divider vertical class="mx-2" />
+
+          <v-btn-group variant="outlined" divided>
+            <v-btn
+              :disabled="!hasPrevious || cursorHistory.length === 0"
+              size="small"
+              @click="onPreviousPage"
+            >
+              <v-icon>mdi-chevron-left</v-icon>
+              <span class="d-none d-sm-inline ml-1">Previous</span>
+            </v-btn>
+
+            <v-btn :disabled="!hasMore" size="small" @click="onNextPage">
+              <span class="d-none d-sm-inline mr-1">Next</span>
+              <v-icon>mdi-chevron-right</v-icon>
+            </v-btn>
+          </v-btn-group>
         </div>
       </v-card-actions>
     </v-card>
@@ -265,7 +296,7 @@ import {
   formatTBTimestamp,
   isPositiveTBAmount,
 } from "@/utils/bigint";
-import { onActivated, onMounted, ref, watch } from "vue";
+import { computed, onActivated, onMounted, ref, watch } from "vue";
 import CreateAccountModal from "./CreateAccountModal.vue";
 
 const { getCurrencyForLedger, loadCurrency } = useCurrency();
@@ -284,9 +315,39 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const showCreateModal = ref(false);
 const expanded = ref<string[]>([]);
-const page = ref(1);
 const itemsPerPage = ref(50);
-const totalItems = ref(0);
+const currentCursor = ref<string | null>(null);
+const cursorHistory = ref<string[]>([]); // Stack for previous page cursors
+const hasMore = ref(false);
+const hasPrevious = ref(false);
+const currentCount = ref(0);
+const showFilters = ref(false);
+
+// Timestamp range filters
+const filters = ref({
+  ledger: undefined as number | undefined,
+  code: undefined as number | undefined,
+  timestamp_min: undefined as string | undefined,
+  timestamp_max: undefined as string | undefined,
+});
+
+// Computed properties for filter UI
+const hasActiveFilters = computed(() => {
+  return !!(
+    filters.value.ledger ||
+    filters.value.code ||
+    filters.value.timestamp_min ||
+    filters.value.timestamp_max
+  );
+});
+
+const activeFiltersCount = computed(() => {
+  let count = 0;
+  if (filters.value.ledger) count++;
+  if (filters.value.code) count++;
+  if (filters.value.timestamp_min || filters.value.timestamp_max) count++;
+  return count;
+});
 
 const headers = [
   { title: "Alias", key: "alias", sortable: true },
@@ -305,28 +366,36 @@ const headers = [
   },
 ];
 
-async function loadAccounts() {
+async function loadAccounts(direction: "next" | "prev" = "next") {
   if (!props.isConnected) return;
 
   loadCurrency();
   loading.value = true;
   error.value = null;
   try {
-    const offset = (page.value - 1) * itemsPerPage.value;
-    const result = await window.tigerBeetleApi.getAccounts(
-      itemsPerPage.value,
-      offset
+    const cleanFilters = Object.fromEntries(
+      Object.entries(filters.value).filter(([_, v]) => v !== undefined)
     );
 
-    if (result.success) {
-      const data = result.data;
+    const result = await window.tigerBeetleApi.getAccounts(
+      itemsPerPage.value,
+      currentCursor.value,
+      direction,
+      Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined
+    );
 
-      if (data && typeof data === "object" && "data" in data) {
-        accounts.value = data.data || [];
-        totalItems.value = data.total || 0;
-      } else {
-        accounts.value = (data as any[]) || [];
-        totalItems.value = accounts.value.length;
+    if (result.success && result.data) {
+      const data = result.data;
+      accounts.value = data.data || [];
+      hasMore.value = data.hasMore || false;
+      hasPrevious.value = data.hasPrevious || false;
+      currentCount.value = data.count || 0;
+
+      // Update cursor for next page
+      if (direction === "next" && data.nextCursor) {
+        currentCursor.value = data.nextCursor;
+      } else if (direction === "prev" && data.prevCursor) {
+        currentCursor.value = data.prevCursor;
       }
     } else {
       error.value = result.error || "Failed to load accounts";
@@ -340,14 +409,30 @@ async function loadAccounts() {
   }
 }
 
-function onPageChange(newPage: number) {
-  page.value = newPage;
-  loadAccounts();
+function onNextPage() {
+  if (!hasMore.value) return;
+  if (currentCursor.value) {
+    cursorHistory.value.push(currentCursor.value);
+  }
+  loadAccounts("next");
+}
+
+function onPreviousPage() {
+  if (!hasPrevious.value || cursorHistory.value.length === 0) return;
+  currentCursor.value = cursorHistory.value.pop() || null;
+  loadAccounts("prev");
 }
 
 function onItemsPerPageChange(newItemsPerPage: number) {
   itemsPerPage.value = newItemsPerPage;
-  page.value = 1;
+  currentCursor.value = null;
+  cursorHistory.value = [];
+  loadAccounts();
+}
+
+function applyFilters() {
+  currentCursor.value = null;
+  cursorHistory.value = [];
   loadAccounts();
 }
 

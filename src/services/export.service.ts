@@ -9,7 +9,7 @@ import type {
 import { CryptoService } from "./crypto.service";
 
 export class ExportService {
-  private static readonly BATCH_SIZE = 8189;
+  private static readonly BATCH_SIZE = 1000; // Match backup service batch size for consistency
   private static readonly MAX_RETRIES = 3;
 
   static async exportData(
@@ -103,33 +103,43 @@ export class ExportService {
     onProgress?: ProgressCallback
   ): Promise<Account[]> {
     const accounts: Account[] = [];
-    let offset = 0;
+    let cursor: string | null = null;
     const batchSize = options.batchSize || this.BATCH_SIZE;
     let hasMore = true;
+    let pageCount = 0;
 
     while (hasMore) {
       const result = await this.retryOperation(async () => {
-        return await window.tigerBeetleApi.getAccounts(batchSize, offset);
+        return await window.tigerBeetleApi.getAccounts(
+          batchSize,
+          cursor,
+          "next"
+        );
       });
 
       if (!result.success) {
         throw new Error("Failed to fetch accounts");
       }
 
-      const batch = this.extractData<Account>(result.data);
+      const data = result.data;
+      const batch = data && data.data ? data.data : [];
+
       if (batch.length === 0) {
         hasMore = false;
       } else {
         accounts.push(...batch);
-        offset += batch.length;
+        hasMore = (data && data.hasMore) || false;
+        cursor = (data && data.nextCursor) || null;
+        pageCount++;
 
-        if (batch.length < batchSize) {
-          hasMore = false;
+        if (pageCount > 10000) {
+          console.warn("Reached maximum page limit for accounts");
+          break;
         }
       }
 
       onProgress?.(
-        20 + (accounts.length / 10000) * 20,
+        20 + Math.min(20, (pageCount * batchSize) / 10000),
         `Fetched ${accounts.length} accounts...`
       );
     }
@@ -142,33 +152,43 @@ export class ExportService {
     onProgress?: ProgressCallback
   ): Promise<Transfer[]> {
     const transfers: Transfer[] = [];
-    let offset = 0;
+    let cursor: string | null = null;
     const batchSize = options.batchSize || this.BATCH_SIZE;
     let hasMore = true;
+    let pageCount = 0;
 
     while (hasMore) {
       const result = await this.retryOperation(async () => {
-        return await window.tigerBeetleApi.getTransfers(batchSize, offset);
+        return await window.tigerBeetleApi.getTransfers(
+          batchSize,
+          cursor,
+          "next"
+        );
       });
 
       if (!result.success) {
         throw new Error("Failed to fetch transfers");
       }
 
-      const batch = this.extractData<Transfer>(result.data);
+      const data = result.data;
+      const batch = data && data.data ? data.data : [];
+
       if (batch.length === 0) {
         hasMore = false;
       } else {
         transfers.push(...batch);
-        offset += batch.length;
+        hasMore = (data && data.hasMore) || false;
+        cursor = (data && data.nextCursor) || null;
+        pageCount++;
 
-        if (batch.length < batchSize) {
-          hasMore = false;
+        if (pageCount > 10000) {
+          console.warn("Reached maximum page limit for transfers");
+          break;
         }
       }
 
       onProgress?.(
-        50 + (transfers.length / 10000) * 20,
+        50 + Math.min(20, (pageCount * batchSize) / 10000),
         `Fetched ${transfers.length} transfers...`
       );
     }

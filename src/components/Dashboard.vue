@@ -113,7 +113,7 @@
         <v-card>
           <v-card-title class="d-flex align-center">
             <v-icon icon="mdi-clock-outline" class="mr-2" />
-            Recent Transfers 
+            Recent Transfers
           </v-card-title>
           <v-card-text>
             <v-list v-if="recentTransfers.length > 0" density="compact">
@@ -316,7 +316,11 @@ async function loadDashboardData(force: boolean = false) {
   const startTime = Date.now();
 
   try {
-    const accountsResult = await window.tigerBeetleApi.getAccounts(25, 0);
+    const accountsResult = await window.tigerBeetleApi.getAccounts(
+      25,
+      null,
+      "next"
+    );
     if (accountsResult.success) {
       const data = accountsResult.data;
       const accounts =
@@ -345,7 +349,11 @@ async function loadDashboardData(force: boolean = false) {
       stats.value.activeLedgers = ledgerMap.size;
     }
 
-    const transfersResult = await window.tigerBeetleApi.getTransfers(25, 0);
+    const transfersResult = await window.tigerBeetleApi.getTransfers(
+      25,
+      null,
+      "next"
+    );
     if (transfersResult.success) {
       const data = transfersResult.data;
       const transfers =
@@ -457,8 +465,8 @@ async function onSearch() {
   try {
     const query = searchQuery.value.toLowerCase();
     const [accountsResult, transfersResult] = await Promise.all([
-      window.tigerBeetleApi.getAccounts(20, 0),
-      window.tigerBeetleApi.getTransfers(20, 0),
+      window.tigerBeetleApi.getAccounts(20, null, "next"),
+      window.tigerBeetleApi.getTransfers(20, null, "next"),
     ]);
 
     const accountsData = accountsResult.success ? accountsResult.data : null;

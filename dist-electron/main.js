@@ -238,7 +238,7 @@ async function createAccount(data) {
     throw error;
   }
 }
-async function queryAccountsFromTigerBeetle(limit = 100, ledger, code, reversed = false, timestamp_min = 0n) {
+async function queryAccountsFromTigerBeetle(limit = 100, ledger, code, reversed = false, timestamp_min = 0n, timestamp_max = 0n) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
   }
@@ -250,46 +250,13 @@ async function queryAccountsFromTigerBeetle(limit = 100, ledger, code, reversed 
       ledger: ledger || 0,
       code: code || 0,
       timestamp_min,
-      timestamp_max: 0n,
+      timestamp_max,
       limit,
       flags: reversed ? 1 : 0,
       reserved: new Uint8Array(6)
     };
     const accounts = await tigerBeetleClient.queryAccounts(filter);
     return accounts;
-  } catch (error) {
-    throw error;
-  }
-}
-async function fetchAllAccountsFromTigerBeetle(ledger, code) {
-  if (!tigerBeetleClient) {
-    throw new Error("Not connected to TigerBeetle");
-  }
-  const allAccounts = [];
-  let timestamp_min = 0n;
-  const batchSize = 8189;
-  let batchCount = 0;
-  try {
-    while (true) {
-      batchCount++;
-      const batch = await queryAccountsFromTigerBeetle(
-        batchSize,
-        ledger,
-        code,
-        false,
-        timestamp_min
-      );
-      if (batch.length === 0) {
-        break;
-      }
-      allAccounts.push(...batch);
-      if (batch.length < batchSize) {
-        break;
-      }
-      const lastAccount = batch[batch.length - 1];
-      timestamp_min = lastAccount.timestamp + 1n;
-    }
-    return allAccounts;
   } catch (error) {
     throw error;
   }
@@ -317,50 +284,42 @@ async function queryTransfersFromTigerBeetle(limit = 100, ledger, code, reversed
     throw error;
   }
 }
-async function fetchAllTransfersFromTigerBeetle(ledger, code) {
+async function getAccounts(limit = 50, cursor = null, direction = "next", filters) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
   }
-  const allTransfers = [];
-  let timestamp_max = 0n;
-  const batchSize = 8189;
-  let batchCount = 0;
   try {
-    while (true) {
-      batchCount++;
-      const batch = await queryTransfersFromTigerBeetle(
-        batchSize,
-        ledger,
-        code,
-        true,
-        0n,
-        timestamp_max
-      );
-      if (batch.length === 0) {
-        break;
+    const fetchLimit = limit + 1;
+    let timestamp_min = 0n;
+    let timestamp_max = 0n;
+    const reversed = direction === "prev";
+    if (cursor) {
+      const cursorTimestamp = BigInt(cursor);
+      if (direction === "next") {
+        timestamp_max = cursorTimestamp - 1n;
+      } else {
+        timestamp_min = cursorTimestamp + 1n;
       }
-      allTransfers.push(...batch);
-      if (batch.length < batchSize) {
-        break;
-      }
-      const lastTransfer = batch[batch.length - 1];
-      timestamp_max = lastTransfer.timestamp - 1n;
     }
-    return allTransfers;
-  } catch (error) {
-    throw error;
-  }
-}
-async function getAccounts(limit = 100, offset = 0) {
-  if (!tigerBeetleClient) {
-    throw new Error("Not connected to TigerBeetle");
-  }
-  try {
-    const pageSize = Math.min(limit, 8189);
-    const allAccounts = await fetchAllAccountsFromTigerBeetle(1);
-    const totalCount = allAccounts.length;
-    const paginatedAccounts = allAccounts.slice(offset, offset + limit);
-    const result = paginatedAccounts.map((tbAcc) => {
+    if (filters == null ? void 0 : filters.timestamp_min) {
+      timestamp_min = BigInt(filters.timestamp_min);
+    }
+    if (filters == null ? void 0 : filters.timestamp_max) {
+      timestamp_max = BigInt(filters.timestamp_max);
+    }
+    const accounts = await queryAccountsFromTigerBeetle(
+      fetchLimit,
+      (filters == null ? void 0 : filters.ledger) || 1,
+      filters == null ? void 0 : filters.code,
+      !reversed,
+      // TigerBeetle's reversed flag (true = newest first)
+      timestamp_min,
+      timestamp_max
+    );
+    const hasMore = accounts.length > limit;
+    const hasPrevious = cursor !== null;
+    const resultAccounts = hasMore ? accounts.slice(0, -1) : accounts;
+    const result = resultAccounts.map((tbAcc) => {
       const debits = tbAcc.debits_posted.toString();
       const credits = tbAcc.credits_posted.toString();
       const balance = (tbAcc.credits_posted - tbAcc.debits_posted).toString();
@@ -393,12 +352,15 @@ async function getAccounts(limit = 100, offset = 0) {
         exists: true
       };
     });
+    const nextCursor = hasMore && result.length > 0 ? result[result.length - 1].timestamp : null;
+    const prevCursor = hasPrevious && result.length > 0 ? result[0].timestamp : null;
     return {
       data: result,
-      total: totalCount,
-      // Use pre-calculated total
-      limit,
-      offset
+      nextCursor,
+      prevCursor,
+      hasMore,
+      hasPrevious,
+      count: result.length
     };
   } catch (error) {
     throw error;
@@ -643,15 +605,41 @@ async function createTransfer(data) {
     throw error;
   }
 }
-async function getTransfers(limit = 100, offset = 0) {
+async function getTransfers(limit = 50, cursor = null, direction = "next", filters) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
   }
   try {
-    const allTransfers = await fetchAllTransfersFromTigerBeetle(1);
-    const totalCount = allTransfers.length;
-    const paginatedTransfers = allTransfers.slice(offset, offset + limit);
-    const result = paginatedTransfers.map((tbTransfer) => {
+    const fetchLimit = limit + 1;
+    let timestamp_min = 0n;
+    let timestamp_max = 0n;
+    const reversed = direction === "next";
+    if (cursor) {
+      const cursorTimestamp = BigInt(cursor);
+      if (direction === "next") {
+        timestamp_max = cursorTimestamp - 1n;
+      } else {
+        timestamp_min = cursorTimestamp + 1n;
+      }
+    }
+    if (filters == null ? void 0 : filters.timestamp_min) {
+      timestamp_min = BigInt(filters.timestamp_min);
+    }
+    if (filters == null ? void 0 : filters.timestamp_max) {
+      timestamp_max = BigInt(filters.timestamp_max);
+    }
+    const transfers = await queryTransfersFromTigerBeetle(
+      fetchLimit,
+      (filters == null ? void 0 : filters.ledger) || 1,
+      filters == null ? void 0 : filters.code,
+      reversed,
+      timestamp_min,
+      timestamp_max
+    );
+    const hasMore = transfers.length > limit;
+    const hasPrevious = cursor !== null;
+    const resultTransfers = hasMore ? transfers.slice(0, -1) : transfers;
+    const result = resultTransfers.map((tbTransfer) => {
       var _a;
       let debitAlias = tbTransfer.debit_account_id.toString();
       let creditAlias = tbTransfer.credit_account_id.toString();
@@ -690,12 +678,15 @@ async function getTransfers(limit = 100, offset = 0) {
         exists: true
       };
     });
+    const nextCursor = hasMore && result.length > 0 ? result[result.length - 1].timestamp : null;
+    const prevCursor = hasPrevious && result.length > 0 ? result[0].timestamp : null;
     return {
       data: result,
-      total: totalCount,
-      // Use pre-calculated total
-      limit,
-      offset
+      nextCursor,
+      prevCursor,
+      hasMore,
+      hasPrevious,
+      count: result.length
     };
   } catch (error) {
     throw error;
@@ -733,10 +724,29 @@ function setupIpcHandlers() {
   });
   ipcMain.handle(
     "get-accounts",
-    async (_event, limit, offset) => {
+    async (_event, limit, cursor, direction, filters) => {
       try {
-        const result = await getAccounts(limit, offset);
-        return { success: true, data: result };
+        const cleanLimit = limit ?? 50;
+        const cleanCursor = cursor === void 0 ? null : cursor;
+        const cleanDirection = direction ?? "next";
+        const cleanFilters = filters ?? void 0;
+        const result = await getAccounts(
+          cleanLimit,
+          cleanCursor,
+          cleanDirection,
+          cleanFilters
+        );
+        return {
+          success: true,
+          data: {
+            data: result.data,
+            nextCursor: result.nextCursor,
+            prevCursor: result.prevCursor,
+            hasMore: result.hasMore,
+            hasPrevious: result.hasPrevious,
+            count: result.count
+          }
+        };
       } catch (error) {
         return { success: false, error: error.message };
       }
@@ -803,10 +813,29 @@ function setupIpcHandlers() {
   });
   ipcMain.handle(
     "get-transfers",
-    async (_event, limit, offset) => {
+    async (_event, limit, cursor, direction, filters) => {
       try {
-        const result = await getTransfers(limit, offset);
-        return { success: true, data: result };
+        const cleanLimit = limit ?? 50;
+        const cleanCursor = cursor === void 0 ? null : cursor;
+        const cleanDirection = direction ?? "next";
+        const cleanFilters = filters ?? void 0;
+        const result = await getTransfers(
+          cleanLimit,
+          cleanCursor,
+          cleanDirection,
+          cleanFilters
+        );
+        return {
+          success: true,
+          data: {
+            data: result.data,
+            nextCursor: result.nextCursor,
+            prevCursor: result.prevCursor,
+            hasMore: result.hasMore,
+            hasPrevious: result.hasPrevious,
+            count: result.count
+          }
+        };
       } catch (error) {
         return { success: false, error: error.message };
       }

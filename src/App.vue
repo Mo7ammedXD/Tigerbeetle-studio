@@ -46,17 +46,6 @@
 
     <v-navigation-drawer permanent width="280">
       <v-list density="compact" nav>
-        <v-list-subheader>OVERVIEW</v-list-subheader>
-        <v-list-item
-          prepend-icon="mdi-view-dashboard"
-          title="Dashboard"
-          value="dashboard"
-          :active="activeView === 'dashboard'"
-          @click="activeView = 'dashboard'"
-          color="primary"
-        />
-
-        <v-divider class="my-2" />
         <v-list-subheader>DATA</v-list-subheader>
         <v-list-item
           prepend-icon="mdi-account-multiple"
@@ -77,7 +66,6 @@
 
         <v-divider class="my-2" />
         <v-list-subheader>TOOLS</v-list-subheader>
-     
 
         <v-list-item
           prepend-icon="mdi-database-export"
@@ -139,12 +127,8 @@
 
     <v-main>
       <v-container fluid class="pa-6">
-        <Dashboard
-          v-if="activeView === 'dashboard'"
-          :is-connected="isConnected"
-        />
         <AccountsView
-          v-else-if="activeView === 'accounts'"
+          v-if="activeView === 'accounts'"
           :is-connected="isConnected"
           @refresh="checkConnection"
         />
@@ -153,7 +137,7 @@
           :is-connected="isConnected"
           @refresh="checkConnection"
         />
-      
+
         <BackupExport
           v-else-if="activeView === 'backup'"
           :is-connected="isConnected"
@@ -203,11 +187,9 @@ import BackupExport from "./components/BackupExport.vue";
 
 import ClusterManager from "./components/ClusterManager.vue";
 import ConnectionModal from "./components/ConnectionModal.vue";
-import Dashboard from "./components/Dashboard.vue";
 import FlowVisualizer from "./components/FlowVisualizer.vue";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog.vue";
 import LedgerConfig from "./components/LedgerConfig.vue";
-
 
 import TransfersView from "./components/TransfersView.vue";
 import TransferTemplates from "./components/TransferTemplates.vue";
@@ -228,7 +210,7 @@ type ViewType =
   | "ledgerconfig"
   | "visualization"
   | "flow";
-const activeView = ref<ViewType>("dashboard");
+const activeView = ref<ViewType>("accounts");
 const isConnected = ref(false);
 const showConnectionModal = ref(false);
 const connectionHealth = ref<"healthy" | "checking" | "disconnected">(
@@ -259,17 +241,11 @@ useKeyboardShortcuts([
   {
     key: "1",
     ctrl: true,
-    description: "Go to Dashboard",
-    action: () => (activeView.value = "dashboard"),
-  },
-  {
-    key: "2",
-    ctrl: true,
     description: "Go to Accounts",
     action: () => (activeView.value = "accounts"),
   },
   {
-    key: "3",
+    key: "2",
     ctrl: true,
     description: "Go to Transfers",
     action: () => (activeView.value = "transfers"),
