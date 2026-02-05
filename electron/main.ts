@@ -185,7 +185,7 @@ async function connectToTigerBeetle(config: ConnectionConfig) {
       try {
         const configPath = path.join(
           app.getPath("userData"),
-          "connection.json"
+          "connection.json",
         );
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
       } catch (error) {}
@@ -211,7 +211,7 @@ function getStoredConnectionConfig(): ConnectionConfig | null {
 
   try {
     const stmt = localDb.prepare(
-      "SELECT cluster_id, replica_addresses FROM connection_config WHERE id = 1"
+      "SELECT cluster_id, replica_addresses FROM connection_config WHERE id = 1",
     );
     const row = stmt.get() as any;
 
@@ -250,7 +250,7 @@ function serializeBigInt(obj: any): any {
 
 function deserializeBigInt(
   value: string | undefined,
-  defaultValue: bigint = 0n
+  defaultValue: bigint = 0n,
 ): bigint {
   if (!value) return defaultValue;
   try {
@@ -324,7 +324,7 @@ async function createAccount(data: AccountData) {
           data.code,
           data.user_data_128 || null,
           data.user_data_64 || null,
-          data.user_data_32 || null
+          data.user_data_32 || null,
         );
       } catch (err) {}
     }
@@ -344,7 +344,7 @@ async function queryAccountsFromTigerBeetle(
   code?: number,
   reversed: boolean = false,
   timestamp_min: bigint = 0n,
-  timestamp_max: bigint = 0n
+  timestamp_max: bigint = 0n,
 ) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -430,7 +430,7 @@ async function fetchAllAccountsFromTigerBeetle(ledger?: number, code?: number) {
         ledger,
         code,
         false,
-        timestamp_min
+        timestamp_min,
       );
 
       if (batch.length === 0) {
@@ -459,7 +459,7 @@ async function queryTransfersFromTigerBeetle(
   code?: number,
   reversed: boolean = true,
   timestamp_min: bigint = 0n,
-  timestamp_max: bigint = 0n
+  timestamp_max: bigint = 0n,
 ) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -488,7 +488,7 @@ async function queryTransfersFromTigerBeetle(
 
 async function fetchAllTransfersFromTigerBeetle(
   ledger?: number,
-  code?: number
+  code?: number,
 ) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -508,7 +508,7 @@ async function fetchAllTransfersFromTigerBeetle(
         code,
         true,
         0n,
-        timestamp_max
+        timestamp_max,
       );
 
       if (batch.length === 0) {
@@ -540,7 +540,7 @@ async function getAccounts(
     code?: number;
     timestamp_min?: string;
     timestamp_max?: string;
-  }
+  },
 ) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -558,15 +558,13 @@ async function getAccounts(
     if (cursor) {
       const cursorTimestamp = BigInt(cursor);
       if (direction === "next") {
-        // For next page, get records with timestamp < cursor (reversed order)
         timestamp_max = cursorTimestamp - 1n;
       } else {
-        // For previous page, get records with timestamp > cursor (forward order)
         timestamp_min = cursorTimestamp + 1n;
       }
     }
 
-    // Apply user filters if provided
+   
     if (filters?.timestamp_min) {
       timestamp_min = BigInt(filters.timestamp_min);
     }
@@ -574,24 +572,20 @@ async function getAccounts(
       timestamp_max = BigInt(filters.timestamp_max);
     }
 
-    // Query accounts using TigerBeetle's native query API
     const accounts = await queryAccountsFromTigerBeetle(
       fetchLimit,
-      filters?.ledger || 1,
+      filters?.ledger || 0,
       filters?.code,
-      !reversed, // TigerBeetle's reversed flag (true = newest first)
+      !reversed,
       timestamp_min,
-      timestamp_max
+      timestamp_max,
     );
 
-    // Check if there are more results
     const hasMore = accounts.length > limit;
     const hasPrevious = cursor !== null;
 
-    // Remove the extra item if we have more
     const resultAccounts = hasMore ? accounts.slice(0, -1) : accounts;
 
-    // Map accounts to response format with aliases from local DB
     const result = resultAccounts.map((tbAcc: any) => {
       const debits = tbAcc.debits_posted.toString();
       const credits = tbAcc.credits_posted.toString();
@@ -601,7 +595,7 @@ async function getAccounts(
       if (localDb) {
         try {
           const stmt = localDb.prepare(
-            "SELECT alias FROM accounts WHERE id = ?"
+            "SELECT alias FROM accounts WHERE id = ?",
           );
           const row = stmt.get(tbAcc.id.toString()) as any;
           if (row) alias = row.alias;
@@ -889,7 +883,7 @@ async function createTransfer(data: TransferData) {
 
     if (errors.length > 0) {
       throw new Error(
-        `Failed to create transfer: ${JSON.stringify(errors[0])}`
+        `Failed to create transfer: ${JSON.stringify(errors[0])}`,
       );
     }
 
@@ -909,7 +903,7 @@ async function createTransfer(data: TransferData) {
           data.code,
           data.user_data_128 || null,
           data.user_data_64 || null,
-          data.user_data_32 || null
+          data.user_data_32 || null,
         );
       } catch (err) {}
     }
@@ -932,7 +926,7 @@ async function getTransfers(
     code?: number;
     timestamp_min?: string;
     timestamp_max?: string;
-  }
+  },
 ) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -969,11 +963,11 @@ async function getTransfers(
     // Query transfers using TigerBeetle's native query API
     const transfers = await queryTransfersFromTigerBeetle(
       fetchLimit,
-      filters?.ledger || 1,
+      filters?.ledger || 0,
       filters?.code,
       reversed,
       timestamp_min,
-      timestamp_max
+      timestamp_max,
     );
 
     // Check if there are more results
@@ -991,13 +985,13 @@ async function getTransfers(
       if (localDb) {
         try {
           const stmt = localDb.prepare(
-            "SELECT alias FROM accounts WHERE id = ?"
+            "SELECT alias FROM accounts WHERE id = ?",
           );
           const debitRow = stmt.get(
-            tbTransfer.debit_account_id.toString()
+            tbTransfer.debit_account_id.toString(),
           ) as any;
           const creditRow = stmt.get(
-            tbTransfer.credit_account_id.toString()
+            tbTransfer.credit_account_id.toString(),
           ) as any;
           if (debitRow) debitAlias = debitRow.alias;
           if (creditRow) creditAlias = creditRow.alias;
@@ -1091,7 +1085,7 @@ function setupIpcHandlers() {
         code?: number;
         timestamp_min?: string;
         timestamp_max?: string;
-      }
+      },
     ) => {
       try {
         const cleanLimit = limit ?? 50;
@@ -1103,7 +1097,7 @@ function setupIpcHandlers() {
           cleanLimit,
           cleanCursor,
           cleanDirection,
-          cleanFilters
+          cleanFilters,
         );
 
         // Return plain serializable object
@@ -1121,7 +1115,7 @@ function setupIpcHandlers() {
       } catch (error: any) {
         return { success: false, error: error.message };
       }
-    }
+    },
   );
 
   ipcMain.handle("delete-account", async (_event, id: string) => {
@@ -1142,7 +1136,7 @@ function setupIpcHandlers() {
       } catch (error: any) {
         return { success: false, error: error.message };
       }
-    }
+    },
   );
 
   ipcMain.handle("lookup-accounts-by-ids", async (_event, ids: string[]) => {
@@ -1202,7 +1196,7 @@ function setupIpcHandlers() {
         code?: number;
         timestamp_min?: string;
         timestamp_max?: string;
-      }
+      },
     ) => {
       try {
         // Clean up parameters to avoid undefined issues
@@ -1215,7 +1209,7 @@ function setupIpcHandlers() {
           cleanLimit,
           cleanCursor,
           cleanDirection,
-          cleanFilters
+          cleanFilters,
         );
 
         // Return plain serializable object
@@ -1233,7 +1227,7 @@ function setupIpcHandlers() {
       } catch (error: any) {
         return { success: false, error: error.message };
       }
-    }
+    },
   );
 }
 
