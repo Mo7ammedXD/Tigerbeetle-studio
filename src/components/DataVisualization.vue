@@ -304,18 +304,18 @@
 
 <script setup lang="ts">
 import { useCurrency } from "@/composables/useCurrency";
-import { formatTBAmount, isPositiveTBAmount } from "@/utils/bigint";
+import {
+  formatTBAmount,
+  isPositiveTBAmount,
+  toDisplayNumber,
+} from "@/utils/bigint";
 import { Chart, registerables } from "chart.js";
 import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 
 Chart.register(...registerables);
 
-const {
-  getCurrencyForLedger,
-  getLedgerName,
-  getAccountCodeName,
-  getTransferCodeName,
-} = useCurrency();
+const { getCurrencyForLedger, getLedgerName, getAccountCodeName } =
+  useCurrency();
 
 interface Props {
   isConnected: boolean;
@@ -429,14 +429,12 @@ async function loadData() {
       const accountsData = accountsResult.data;
       const transfersData = transfersResult.data;
 
-      const accounts =
-        accountsData && "data" in accountsData
-          ? accountsData.data
-          : (accountsData as any[]) || [];
-      const transfers =
-        transfersData && "data" in transfersData
-          ? transfersData.data
-          : (transfersData as any[]) || [];
+      const accounts = Array.isArray(accountsData)
+        ? accountsData
+        : accountsData?.data ?? [];
+      const transfers = Array.isArray(transfersData)
+        ? transfersData
+        : transfersData?.data ?? [];
 
       processData(accounts, transfers);
       await nextTick();
@@ -609,7 +607,10 @@ function renderDistributionChart(accounts: any[]) {
   };
 
   accounts.forEach((a) => {
-    const balance = Number(BigInt(a.balance || "0") / BigInt(100));
+    const balance = toDisplayNumber(
+      a.balance || "0",
+      getCurrencyForLedger(a.ledger)
+    );
     if (balance < 1000) balanceRanges["0-1K"]++;
     else if (balance < 10000) balanceRanges["1K-10K"]++;
     else if (balance < 100000) balanceRanges["10K-100K"]++;

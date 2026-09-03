@@ -170,7 +170,7 @@
         <div class="text-h6 mb-4">Cluster Comparison</div>
         <v-card variant="outlined">
           <v-card-text>
-            <v-simple-table v-if="clusters.length > 1">
+            <v-table v-if="clusters.length > 1">
               <template #default>
                 <thead>
                   <tr>
@@ -213,7 +213,7 @@
                   </tr>
                 </tbody>
               </template>
-            </v-simple-table>
+            </v-table>
             <v-alert v-else type="info" variant="tonal">
               Add more clusters to compare
             </v-alert>
@@ -261,7 +261,7 @@
 
             <div class="text-subtitle-2 mb-2">Replica Addresses *</div>
             <v-text-field
-              v-for="(address, index) in clusterForm.replica_addresses"
+              v-for="(_address, index) in clusterForm.replica_addresses"
               :key="index"
               v-model="clusterForm.replica_addresses[index]"
               variant="outlined"
@@ -317,7 +317,7 @@ interface Props {
   isConnected: boolean;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 const emit = defineEmits<{ clusterChanged: [] }>();
 
 interface Cluster {

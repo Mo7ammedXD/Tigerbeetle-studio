@@ -21,7 +21,7 @@
           <div class="mb-2">
             <div class="text-subtitle-2 mb-2">Replica Addresses</div>
             <v-text-field
-              v-for="(address, index) in replicaAddresses"
+              v-for="(_address, index) in replicaAddresses"
               :key="index"
               v-model="replicaAddresses[index]"
               variant="outlined"

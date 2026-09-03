@@ -70,14 +70,6 @@
                   class="mb-2"
                 />
 
-                <v-checkbox
-                  v-model="exportOptions.compress"
-                  label="Compress output (ZIP)"
-                  density="compact"
-                  hide-details
-                  class="mb-4"
-                />
-
                 <v-btn
                   color="primary"
                   block
@@ -229,14 +221,6 @@
                       {{ backup.accounts }} accounts,
                       {{ backup.transfers }} transfers
                     </v-list-item-subtitle>
-                    <template #append>
-                      <v-btn
-                        icon="mdi-download"
-                        variant="text"
-                        size="small"
-                        @click="downloadBackup(backup)"
-                      />
-                    </template>
                   </v-list-item>
                 </v-list>
                 <v-alert v-else type="info" variant="tonal">
@@ -298,12 +282,10 @@ const exportOptions = ref<{
   entity: string;
   format: string;
   includeMetadata: boolean;
-  compress: boolean;
 }>({
   entity: "All Data",
   format: "JSON",
   includeMetadata: true,
-  compress: false,
 });
 
 const backupOptions = ref({
@@ -361,7 +343,6 @@ async function executeExport() {
       entity: entityMap[exportOptions.value.entity] || "all",
       format: formatMap[exportOptions.value.format] || "json",
       includeMetadata: exportOptions.value.includeMetadata,
-      compress: exportOptions.value.compress,
     };
 
     const result = await ExportService.exportData(
@@ -491,8 +472,6 @@ async function executeImport() {
 function loadBackupHistory() {
   backupHistory.value = BackupService.getHistory();
 }
-
-function downloadBackup(backup: any) {}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 Bytes";

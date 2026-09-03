@@ -246,8 +246,8 @@
             <span v-else class="text-grey text-caption">None</span>
           </template>
 
-          <template #item.created_at="{ item }">
-            <span class="text-caption">{{ formatDate(item.created_at) }}</span>
+          <template #item.timestamp="{ item }">
+            <span class="text-caption">{{ formatTimestamp(item.timestamp) }}</span>
           </template>
 
           <template #expanded-row="{ item }">
@@ -462,7 +462,7 @@ const headers = [
   { title: "Ledger", key: "ledger", sortable: true },
   { title: "Code", key: "code", sortable: true },
   { title: "Flags", key: "flags", sortable: false },
-  { title: "Date", key: "created_at", sortable: true },
+  { title: "Date", key: "timestamp", sortable: true },
 ];
 
 async function loadTransfers(direction: "next" | "prev" = "next") {
@@ -586,18 +586,6 @@ function formatAmount(value: string | number, ledger?: number): string {
     return formatTBAmount(strValue, currency);
   }
   return formatTBAmount(strValue);
-}
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleString("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZoneName: "short",
-  });
 }
 
 function formatTimestamp(timestamp: string): string {

@@ -271,7 +271,11 @@
 
 <script setup lang="ts">
 import { useCurrency } from "@/composables/useCurrency";
-import { formatTBAmount, isPositiveTBAmount } from "@/utils/bigint";
+import {
+  formatTBAmount,
+  isPositiveTBAmount,
+  toDisplayNumber,
+} from "@/utils/bigint";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 
 interface Props {
@@ -396,14 +400,12 @@ async function loadFlowData() {
       const accountsData = accountsResult.data;
       const transfersData = transfersResult.data;
 
-      const accounts =
-        accountsData && "data" in accountsData
-          ? accountsData.data
-          : (accountsData as any[]) || [];
-      const transfers =
-        transfersData && "data" in transfersData
-          ? transfersData.data
-          : (transfersData as any[]) || [];
+      const accounts = Array.isArray(accountsData)
+        ? accountsData
+        : accountsData?.data ?? [];
+      const transfers = Array.isArray(transfersData)
+        ? transfersData
+        : transfersData?.data ?? [];
 
       buildFlowGraph(accounts, transfers);
       renderFlow();
@@ -437,7 +439,9 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
 
   if (minAmount.value > 0) {
     filteredTransfers = filteredTransfers.filter(
-      (t) => Number(BigInt(t.amount || "0") / BigInt(100)) >= minAmount.value
+      (t) =>
+        toDisplayNumber(t.amount || "0", getCurrencyForLedger(t.ledger)) >=
+        minAmount.value
     );
   }
 
@@ -492,7 +496,10 @@ function buildFlowGraph(accounts: any[], transfers: any[]) {
       from: debitId,
       to: creditId,
       amount: transfer.amount,
-      weight: Number(amount / BigInt(100)),
+      weight: toDisplayNumber(
+        transfer.amount || "0",
+        getCurrencyForLedger(transfer.ledger)
+      ),
     });
   });
 
@@ -540,15 +547,16 @@ function layoutNodes(nodeList: FlowNode[]) {
 
 function renderFlow() {
   if (!ctx || !flowCanvas.value) return;
+  const context = ctx;
 
   const width = flowCanvas.value.width;
   const height = flowCanvas.value.height;
 
-  ctx.clearRect(0, 0, width, height);
+  context.clearRect(0, 0, width, height);
 
-  ctx.save();
-  ctx.translate(offsetX, offsetY);
-  ctx.scale(scale, scale);
+  context.save();
+  context.translate(offsetX, offsetY);
+  context.scale(scale, scale);
 
   edges.value.forEach((edge) => {
     const fromNode = nodes.value.find((n) => n.id === edge.from);
@@ -558,14 +566,14 @@ function renderFlow() {
       const maxWeight = Math.max(...edges.value.map((e) => e.weight), 1);
       const lineWidth = 1 + (edge.weight / maxWeight) * 5;
 
-      ctx.beginPath();
-      ctx.moveTo(fromNode.x, fromNode.y);
-      ctx.lineTo(toNode.x, toNode.y);
-      ctx.strokeStyle = edge.weight > maxWeight * 0.7 ? "#F44336" : "#666";
-      ctx.lineWidth = lineWidth;
-      ctx.stroke();
+      context.beginPath();
+      context.moveTo(fromNode.x, fromNode.y);
+      context.lineTo(toNode.x, toNode.y);
+      context.strokeStyle = edge.weight > maxWeight * 0.7 ? "#F44336" : "#666";
+      context.lineWidth = lineWidth;
+      context.stroke();
 
-      drawArrow(ctx, fromNode.x, fromNode.y, toNode.x, toNode.y);
+      drawArrow(context, fromNode.x, fromNode.y, toNode.x, toNode.y);
     }
   });
 
@@ -573,21 +581,21 @@ function renderFlow() {
     const color = getNodeColor(node.type);
     const radius = 20;
 
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    context.beginPath();
+    context.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+    context.fillStyle = color;
+    context.fill();
+    context.strokeStyle = "#fff";
+    context.lineWidth = 2;
+    context.stroke();
 
-    ctx.fillStyle = "#000";
-    ctx.font = "12px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(node.alias, node.x, node.y + radius + 15);
+    context.fillStyle = "#000";
+    context.font = "12px sans-serif";
+    context.textAlign = "center";
+    context.fillText(node.alias, node.x, node.y + radius + 15);
   });
 
-  ctx.restore();
+  context.restore();
 }
 
 function drawArrow(

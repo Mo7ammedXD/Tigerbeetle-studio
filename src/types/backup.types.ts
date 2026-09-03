@@ -50,7 +50,6 @@ export interface ExportOptions {
   entity: "all" | "accounts" | "transfers";
   format: "json" | "csv" | "sql";
   includeMetadata: boolean;
-  compress: boolean;
   batchSize?: number;
   filters?: ExportFilters;
 }

@@ -196,16 +196,6 @@ export class ExportService {
     return this.applyFilters(transfers, options);
   }
 
-  private static extractData<T>(data: any): T[] {
-    if (Array.isArray(data)) {
-      return data;
-    }
-    if (data && typeof data === "object" && "data" in data) {
-      return Array.isArray(data.data) ? data.data : [];
-    }
-    return [];
-  }
-
   private static applyFilters<T extends Account | Transfer>(
     items: T[],
     options: ExportOptions

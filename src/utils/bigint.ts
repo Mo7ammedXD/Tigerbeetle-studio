@@ -5,22 +5,57 @@ import type {
 } from "@/types/tigerbeetle";
 import { DEFAULT_CURRENCY } from "@/types/tigerbeetle";
 
+function zeroAmount(currency: CurrencyConfig): string {
+  return currency.decimals > 0
+    ? `${currency.symbol}0.${"0".repeat(currency.decimals)}`
+    : `${currency.symbol}0`;
+}
+
 export function formatTBAmount(
   amount: TB_Amount,
   currency: CurrencyConfig = DEFAULT_CURRENCY
 ): string {
   try {
     const bigIntAmount = BigInt(amount);
-    const divisor = BigInt(10 ** currency.decimals);
-    const whole = bigIntAmount / divisor;
-    const fraction = bigIntAmount % divisor;
 
-    const fractionStr = fraction.toString().padStart(currency.decimals, "0");
+    // Split the sign off first: BigInt remainder keeps the sign, so a negative
+    // amount would otherwise render as "$-1.-50".
+    const negative = bigIntAmount < 0n;
+    const absolute = negative ? -bigIntAmount : bigIntAmount;
+
+    // 10n ** BigInt(d) avoids the float intermediate of 10 ** d.
+    const divisor = 10n ** BigInt(currency.decimals);
+    const whole = absolute / divisor;
+    const fraction = absolute % divisor;
+
+    const sign = negative ? "-" : "";
     const wholeStr = whole.toLocaleString("en-US");
 
-    return `${currency.symbol}${wholeStr}.${fractionStr}`;
+    // Zero-decimal currencies (e.g. JPY) must not get a trailing separator.
+    if (currency.decimals === 0) {
+      return `${sign}${currency.symbol}${wholeStr}`;
+    }
+
+    const fractionStr = fraction.toString().padStart(currency.decimals, "0");
+    return `${sign}${currency.symbol}${wholeStr}.${fractionStr}`;
   } catch (error) {
-    return `${currency.symbol}0.00`;
+    return zeroAmount(currency);
+  }
+}
+
+/**
+ * Scale a raw TigerBeetle integer amount to a display-unit number using the
+ * currency's decimal places. Lossy above 2^53 and intended only for charts,
+ * thresholds and bucketing - never for balance arithmetic.
+ */
+export function toDisplayNumber(
+  amount: TB_Amount,
+  currency: CurrencyConfig = DEFAULT_CURRENCY
+): number {
+  try {
+    return Number(BigInt(amount)) / 10 ** currency.decimals;
+  } catch (error) {
+    return 0;
   }
 }
 
@@ -43,7 +78,8 @@ export function parseTBAmount(
     .padEnd(currency.decimals, "0")
     .slice(0, currency.decimals);
   const amount =
-    BigInt(whole) * BigInt(10 ** currency.decimals) + BigInt(paddedFraction);
+    BigInt(whole) * 10n ** BigInt(currency.decimals) +
+    BigInt(paddedFraction || "0");
   return amount.toString();
 }
 

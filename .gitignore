@@ -137,3 +137,7 @@ dist
 
 # Electron build output
 release/
+dist-electron/
+
+# macOS
+.DS_Store

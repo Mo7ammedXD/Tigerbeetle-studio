@@ -117,6 +117,15 @@ const api = {
     );
   },
 
+  // Import / Lookup
+  importAccountsFromJson: (filePath: string): Promise<ApiResponse<any>> => {
+    return ipcRenderer.invoke("import-accounts-from-json", filePath);
+  },
+
+  lookupAccountsByIds: (ids: string[]): Promise<ApiResponse<any[]>> => {
+    return ipcRenderer.invoke("lookup-accounts-by-ids", ids);
+  },
+
   lookupTransfersByIds: (ids: string[]): Promise<ApiResponse<any[]>> => {
     return ipcRenderer.invoke("lookup-transfers-by-ids", ids);
   },
@@ -141,11 +150,6 @@ const api = {
 
 try {
   contextBridge.exposeInMainWorld("tigerBeetleApi", api);
-} catch (error) {}
-
-// TypeScript declaration for window object
-declare global {
-  interface Window {
-    tigerBeetleApi: typeof api;
-  }
+} catch (error) {
+  console.error("[preload] Failed to expose tigerBeetleApi:", error);
 }

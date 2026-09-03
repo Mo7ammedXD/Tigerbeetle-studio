@@ -39,6 +39,139 @@
         </div>
       </v-card-title>
 
+      <!-- Filter Panel -->
+      <v-expand-transition>
+        <div v-show="showFilters">
+          <v-divider />
+          <v-card-text class="pa-4">
+            <div class="d-flex flex-wrap gap-4">
+              <!-- Date Range Filter -->
+              <div
+                class="flex-grow-1"
+                style="min-width: 250px; max-width: 400px"
+              >
+                <v-label class="text-caption font-weight-bold mb-2">
+                  <v-icon size="small" class="mr-1">mdi-calendar-range</v-icon>
+                  Date Range
+                </v-label>
+                <div class="d-flex gap-2">
+                  <v-text-field
+                    v-model="dateRange.start"
+                    type="date"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    placeholder="Start date"
+                    clearable
+                  />
+                  <v-text-field
+                    v-model="dateRange.end"
+                    type="date"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    placeholder="End date"
+                    clearable
+                  />
+                </div>
+              </div>
+
+              <!-- Ledger Filter -->
+              <div style="min-width: 150px">
+                <v-label class="text-caption font-weight-bold mb-2">
+                  <v-icon size="small" class="mr-1"
+                    >mdi-book-open-variant</v-icon
+                  >
+                  Ledger
+                </v-label>
+                <v-text-field
+                  v-model.number="filters.ledger"
+                  type="number"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  placeholder="All ledgers"
+                  clearable
+                />
+              </div>
+
+              <!-- Code Filter -->
+              <div style="min-width: 150px">
+                <v-label class="text-caption font-weight-bold mb-2">
+                  <v-icon size="small" class="mr-1">mdi-code-tags</v-icon>
+                  Code
+                </v-label>
+                <v-text-field
+                  v-model.number="filters.code"
+                  type="number"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  placeholder="All codes"
+                  clearable
+                />
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="d-flex align-end gap-2">
+                <v-btn
+                  color="primary"
+                  variant="flat"
+                  @click="applyFilters"
+                  prepend-icon="mdi-filter-check"
+                >
+                  Apply
+                </v-btn>
+                <v-btn
+                  variant="outlined"
+                  @click="clearFilters"
+                  prepend-icon="mdi-filter-off"
+                >
+                  Clear
+                </v-btn>
+              </div>
+            </div>
+
+            <!-- Active Filters Chips -->
+            <div v-if="hasActiveFilters" class="mt-3 d-flex flex-wrap gap-2">
+              <v-chip
+                v-if="dateRange.start || dateRange.end"
+                size="small"
+                closable
+                @click:close="clearDateRange"
+              >
+                <v-icon start size="small">mdi-calendar</v-icon>
+                {{ formatDateRangeChip() }}
+              </v-chip>
+              <v-chip
+                v-if="filters.ledger"
+                size="small"
+                closable
+                @click:close="
+                  filters.ledger = undefined;
+                  applyFilters();
+                "
+              >
+                <v-icon start size="small">mdi-book-open-variant</v-icon>
+                Ledger: {{ filters.ledger }}
+              </v-chip>
+              <v-chip
+                v-if="filters.code"
+                size="small"
+                closable
+                @click:close="
+                  filters.code = undefined;
+                  applyFilters();
+                "
+              >
+                <v-icon start size="small">mdi-code-tags</v-icon>
+                Code: {{ filters.code }}
+              </v-chip>
+            </div>
+          </v-card-text>
+        </div>
+      </v-expand-transition>
+
       <v-alert
         v-if="error"
         type="error"
@@ -323,6 +456,11 @@ const hasPrevious = ref(false);
 const currentCount = ref(0);
 const showFilters = ref(false);
 
+const dateRange = ref({
+  start: "",
+  end: "",
+});
+
 // Timestamp range filters
 const filters = ref({
   ledger: undefined as number | undefined,
@@ -431,9 +569,52 @@ function onItemsPerPageChange(newItemsPerPage: number) {
 }
 
 function applyFilters() {
+  // Convert date range to nanosecond timestamps
+  if (dateRange.value.start) {
+    const startDate = new Date(dateRange.value.start);
+    filters.value.timestamp_min = (startDate.getTime() * 1000000).toString();
+  } else {
+    filters.value.timestamp_min = undefined;
+  }
+
+  if (dateRange.value.end) {
+    const endDate = new Date(dateRange.value.end);
+    endDate.setHours(23, 59, 59, 999); // End of day
+    filters.value.timestamp_max = (endDate.getTime() * 1000000).toString();
+  } else {
+    filters.value.timestamp_max = undefined;
+  }
+
   currentCursor.value = null;
   cursorHistory.value = [];
   loadAccounts();
+}
+
+function clearFilters() {
+  dateRange.value.start = "";
+  dateRange.value.end = "";
+  filters.value.ledger = undefined;
+  filters.value.code = undefined;
+  filters.value.timestamp_min = undefined;
+  filters.value.timestamp_max = undefined;
+  applyFilters();
+}
+
+function clearDateRange() {
+  dateRange.value.start = "";
+  dateRange.value.end = "";
+  applyFilters();
+}
+
+function formatDateRangeChip(): string {
+  if (dateRange.value.start && dateRange.value.end) {
+    return `${dateRange.value.start} to ${dateRange.value.end}`;
+  } else if (dateRange.value.start) {
+    return `From ${dateRange.value.start}`;
+  } else if (dateRange.value.end) {
+    return `Until ${dateRange.value.end}`;
+  }
+  return "";
 }
 
 async function deleteAccountConfirm(account: any) {

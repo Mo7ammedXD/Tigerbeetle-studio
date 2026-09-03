@@ -48,6 +48,14 @@
       <v-list density="compact" nav>
         <v-list-subheader>DATA</v-list-subheader>
         <v-list-item
+          prepend-icon="mdi-view-dashboard"
+          title="Dashboard"
+          value="dashboard"
+          :active="activeView === 'dashboard'"
+          @click="activeView = 'dashboard'"
+          color="primary"
+        />
+        <v-list-item
           prepend-icon="mdi-account-multiple"
           title="Accounts"
           value="accounts"
@@ -83,6 +91,14 @@
           @click="activeView = 'search'"
           color="primary"
         />
+        <v-list-item
+          prepend-icon="mdi-layers-triple"
+          title="Bulk Operations"
+          value="bulk"
+          :active="activeView === 'bulk'"
+          @click="activeView = 'bulk'"
+          color="primary"
+        />
 
         <v-divider class="my-2" />
         <v-list-subheader>ADVANCED</v-list-subheader>
@@ -115,6 +131,14 @@
         <v-divider class="my-2" />
         <v-list-subheader>VISUALIZATION</v-list-subheader>
         <v-list-item
+          prepend-icon="mdi-chart-box"
+          title="Charts"
+          value="visualization"
+          :active="activeView === 'visualization'"
+          @click="activeView = 'visualization'"
+          color="primary"
+        />
+        <v-list-item
           prepend-icon="mdi-graph"
           title="Flow Visualizer"
           value="flow"
@@ -127,8 +151,12 @@
 
     <v-main>
       <v-container fluid class="pa-6">
+        <Dashboard
+          v-if="activeView === 'dashboard'"
+          :is-connected="isConnected"
+        />
         <AccountsView
-          v-if="activeView === 'accounts'"
+          v-else-if="activeView === 'accounts'"
           :is-connected="isConnected"
           @refresh="checkConnection"
         />
@@ -146,6 +174,11 @@
           v-else-if="activeView === 'search'"
           :is-connected="isConnected"
         />
+        <BulkOperations
+          v-else-if="activeView === 'bulk'"
+          :is-connected="isConnected"
+          @refresh="checkConnection"
+        />
         <TransferTemplates
           v-else-if="activeView === 'templates'"
           :is-connected="isConnected"
@@ -162,6 +195,10 @@
           :is-connected="isConnected"
         />
 
+        <DataVisualization
+          v-else-if="activeView === 'visualization'"
+          :is-connected="isConnected"
+        />
         <FlowVisualizer
           v-else-if="activeView === 'flow'"
           :is-connected="isConnected"
@@ -184,9 +221,12 @@ import { useTheme } from "vuetify";
 import AccountsView from "./components/AccountsView.vue";
 import AdvancedSearch from "./components/AdvancedSearch.vue";
 import BackupExport from "./components/BackupExport.vue";
+import BulkOperations from "./components/BulkOperations.vue";
 
 import ClusterManager from "./components/ClusterManager.vue";
 import ConnectionModal from "./components/ConnectionModal.vue";
+import Dashboard from "./components/Dashboard.vue";
+import DataVisualization from "./components/DataVisualization.vue";
 import FlowVisualizer from "./components/FlowVisualizer.vue";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog.vue";
 import LedgerConfig from "./components/LedgerConfig.vue";
@@ -199,30 +239,28 @@ type ViewType =
   | "dashboard"
   | "accounts"
   | "transfers"
-  | "query"
-  | "history"
   | "bulk"
   | "backup"
   | "search"
   | "templates"
-  | "pending"
   | "clusters"
   | "ledgerconfig"
   | "visualization"
   | "flow";
-const activeView = ref<ViewType>("accounts");
+const activeView = ref<ViewType>("dashboard");
 const isConnected = ref(false);
 const showConnectionModal = ref(false);
 const connectionHealth = ref<"healthy" | "checking" | "disconnected">(
   "disconnected"
 );
-const darkMode = ref(false);
 const shortcutsDialog = ref<InstanceType<typeof KeyboardShortcutsDialog>>();
 const theme = useTheme();
+// Seed from the theme Vuetify actually starts on, not a hardcoded false.
+const darkMode = ref(theme.global.current.value.dark);
 let healthCheckInterval: number | null = null;
 
 const savedDarkMode = localStorage.getItem("tigerbeetle_dark_mode");
-if (savedDarkMode) {
+if (savedDarkMode !== null) {
   darkMode.value = savedDarkMode === "true";
   theme.global.name.value = darkMode.value ? "dark" : "light";
 }
@@ -241,11 +279,17 @@ useKeyboardShortcuts([
   {
     key: "1",
     ctrl: true,
+    description: "Go to Dashboard",
+    action: () => (activeView.value = "dashboard"),
+  },
+  {
+    key: "2",
+    ctrl: true,
     description: "Go to Accounts",
     action: () => (activeView.value = "accounts"),
   },
   {
-    key: "2",
+    key: "3",
     ctrl: true,
     description: "Go to Transfers",
     action: () => (activeView.value = "transfers"),

@@ -245,7 +245,7 @@
 <script setup lang="ts">
 import { useCurrency } from "@/composables/useCurrency";
 import { formatTBAmount, isPositiveTBAmount } from "@/utils/bigint";
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 
 const {
   loadCurrency,
@@ -280,10 +280,6 @@ const searchResults = ref<any[]>([]);
 let refreshInterval: number | null = null;
 let lastRefreshTime = 0;
 const MIN_REFRESH_INTERVAL = 5000;
-
-const maxDailyTransfers = computed(() => {
-  return Math.max(...transferActivity.value.map((d) => d.count), 1);
-});
 
 onMounted(() => {
   loadDashboardData(true);
@@ -323,15 +319,16 @@ async function loadDashboardData(force: boolean = false) {
     );
     if (accountsResult.success) {
       const data = accountsResult.data;
-      const accounts =
-        data && "data" in data ? data.data : (data as any[]) || [];
+      const accounts = Array.isArray(data) ? data : data?.data ?? [];
 
-      stats.value.totalAccounts =
-        data && "total" in data ? data.total : accounts.length;
+      // The cursor API returns no grand total, so this reflects the page size.
+      stats.value.totalAccounts = accounts.length;
 
-      const sortedAccounts = [...accounts].sort((a, b) =>
-        Number(BigInt(b.balance || "0") - BigInt(a.balance || "0"))
-      );
+      const sortedAccounts = [...accounts].sort((a, b) => {
+        const balanceA = BigInt(a.balance || "0");
+        const balanceB = BigInt(b.balance || "0");
+        return balanceB > balanceA ? 1 : balanceB < balanceA ? -1 : 0;
+      });
       topAccounts.value = sortedAccounts.slice(0, 5);
 
       const ledgerMap = new Map<number, number>();
@@ -356,11 +353,10 @@ async function loadDashboardData(force: boolean = false) {
     );
     if (transfersResult.success) {
       const data = transfersResult.data;
-      const transfers =
-        data && "data" in data ? data.data : (data as any[]) || [];
+      const transfers = Array.isArray(data) ? data : data?.data ?? [];
 
-      stats.value.totalTransfers =
-        data && "total" in data ? data.total : transfers.length;
+      // The cursor API returns no grand total, so this reflects the page size.
+      stats.value.totalTransfers = transfers.length;
 
       let totalVolume = BigInt(0);
       transfers.forEach((t: any) => {

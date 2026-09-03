@@ -11,8 +11,21 @@ export interface KeyboardShortcut {
 }
 
 export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
+  const isEditableTarget = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    const tag = target.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  };
+
   const handleKeyDown = (event: KeyboardEvent) => {
+    const typing = isEditableTarget(event.target);
+
     for (const shortcut of shortcuts) {
+      // Never steal plain keystrokes from a field the user is typing in.
+      const usesModifier = shortcut.ctrl || shortcut.alt || shortcut.meta;
+      if (typing && !usesModifier) continue;
+
       const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase();
       const ctrlMatch = shortcut.ctrl
         ? event.ctrlKey || event.metaKey

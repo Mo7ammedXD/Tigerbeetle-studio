@@ -1,367 +1,192 @@
-#  TigerBeetle Studio
+# TigerBeetle Studio
 
-A modern desktop GUI application for managing and visualizing TigerBeetle databases.
+A desktop GUI for managing and visualizing [TigerBeetle](https://tigerbeetle.com) databases.
+Built with Electron, Vue 3 and Vuetify.
+
+> **Status:** early (`0.1.0`). The feature set below is what actually ships today;
+> known gaps are listed explicitly in [Not implemented yet](#not-implemented-yet).
 
 ---
 
-##  Core Functionality
+## Getting started
 
-###  Dashboard
+### Prerequisites
 
-Real-time overview of your TigerBeetle database with key metrics and visualizations.
+- **Node.js 18+** and npm
+- A **running TigerBeetle cluster** you can reach (the app is a client; it does
+  not start or embed a server)
+- Native modules (`better-sqlite3`, `tigerbeetle-node`) are rebuilt against
+  Electron on install, so you need a working C/C++ toolchain:
+  - macOS: Xcode Command Line Tools (`xcode-select --install`)
+  - Windows: Visual Studio Build Tools ("Desktop development with C++")
+  - Linux: `build-essential` and `python3`
 
-**Features:**
+### Install
 
-- **Live Statistics**: Total accounts, transfers, and balance summaries
-- **Recent Activity**: Latest accounts and transfers with quick actions
-- **Performance Metrics**: Transaction throughput and database health
-- **Visual Charts**: Balance distribution, transfer trends, and activity graphs
-- **Quick Actions**: Create accounts/transfers directly from dashboard
+```bash
+git clone <your-fork-url>
+cd Tigerbeetle-studio
+npm install          # runs electron-rebuild for the native modules
+```
 
-###  Account Management
+### Run in development
 
-Complete account lifecycle management with advanced filtering and search.
+```bash
+npm run electron:dev
+```
 
-**Features:**
+This starts Vite on port 5173 and launches Electron against it with DevTools
+open. Override the port with `VITE_DEV_SERVER_PORT` if 5173 is taken.
 
-- **Account List**: Paginated view of all accounts
-- **Create Accounts**: Single or bulk account creation with validation
-- **Account Details**: View complete account information including:
-  - Balance (debits, credits, pending)
-  - Flags and status
-  - User data fields (128-bit, 64-bit, 32-bit)
-  - Timestamp and ledger information
-- **Search & Filter**: Find accounts by ID, ledger, code, or balance range
-- **Account History**: View all transfers for a specific account
-- **Bulk Operations**: Import/export accounts in batch
+### Type-check and build
 
-###  Transfer Management
+```bash
+npm run build:check   # vue-tsc, then vite build, then electron-builder
+npm run build         # skips the type-check
+```
 
-Comprehensive transfer operations with templates and pending transfer support.
+Installers are written to `release/`: `.dmg` (macOS), NSIS `.exe` (Windows),
+`AppImage` (Linux). Builds are unsigned — see
+[Not implemented yet](#not-implemented-yet).
 
-**Features:**
+### Connect to a cluster
 
-- **Transfer List**: View all transfers with detailed information
-- **Create Transfers**: Single or batch transfer creation
-- **Transfer Details**:
-  - Debit and credit account IDs
-  - Amount with currency formatting
-  - Ledger and code
-  - Flags (linked, pending, post-pending, voiding)
-  - User data fields
-  - Timestamp
-- **Pending Transfers**: Manage two-phase commit transfers
-- **Transfer Templates**: Save and reuse common transfer patterns
-- **Linked Transfers**: Create dependent transfer chains
-- **Voiding**: Reverse transfers with proper audit trail
+Launch the app and click **Connect**, then supply:
 
-###  Advanced Search
+- **Cluster ID** — e.g. `0`
+- **Replica addresses** — e.g. `3000` or `127.0.0.1:3000`, one entry per replica
 
-Powerful search capabilities across accounts and transfers.
-
-**Features:**
-
-- **Multi-Field Search**: Search by ID, ledger, code, amount, balance
-- **Combined Filters**: Apply multiple filters simultaneously
-- **Export Results**: Download search results as JSON/CSV
-
-###  Data Visualization
-
-Financial insights.
-
-**Features:**
-
-- **Flow Visualization**: Sankey diagrams showing money flow between accounts
-
-###  Backup & Export
-
-Comprehensive data backup and export functionality.
-
-**Features:**
-
-- **Full Backup**: Export entire database with encryption
-- **Selective Export**: Choose specific accounts/transfers to export
-- **Multiple Formats**:
-  - JSON (structured data)
-  - CSV (spreadsheet compatible)
-  - SQL (database import)
-- **Encryption**: AES-256-GCM encryption for sensitive data
-- **Compression**: Reduce backup file sizes
-- **Backup History**: Track and manage previous backups
-- **Import/Restore**: Import data from backup files
-- **Validation**: Verify data integrity before import
-- **Duplicate Detection**: Skip or merge duplicate records
-
-###  Configuration Management
-
-#### Ledger Configuration
-
-Define and manage ledgers with custom settings.
-
-**Features:**
-
-- **Ledger Setup**: Create ledgers with unique IDs
-- **Currency Assignment**: Set currency per ledger
-- **Metadata**: Add descriptions and notes
-- **Multi-Ledger Support**: Manage multiple ledgers simultaneously
-
-#### Currency System
-
-Flexible multi-currency support with automatic formatting.
-
-**Supported Currencies:**
-
-- **Arabic Currencies**: LYD (دينار ليبي), EGP (جنيه مصري), TND (دينار تونسي), SAR (ريال سعودي), AED (درهم إماراتي)
-- **International**: USD ($), EUR (€), GBP (£), JPY (¥)
-- **Cryptocurrencies**: BTC (₿), ETH (Ξ)
-- **Custom Currencies**: Define your own with custom symbols and decimals
-
-**Features:**
-
-- **Per-Ledger Currency**: Each ledger can have its own currency
-- **Global Default**: Set a fallback currency
-- **Automatic Formatting**: All amounts display in correct currency format
-- **Decimal Precision**: Support for 0-18 decimal places
-- **BigInt-Safe**: Financial-grade precision
-
-#### Cluster Management
-
-Connect and manage TigerBeetle clusters.
-
-**Features:**
-
-- **Connection Manager**: Save and switch between multiple clusters
-- **Cluster Profiles**: Store connection details (cluster ID, replica addresses)
-- **Health Monitoring**: Check cluster status and connectivity
-- **Auto-Reconnect**: Automatic reconnection on connection loss
-
-###  User Interface
-
-#### Theme & Appearance
-
-- **Dark/Light Mode**: Toggle between themes
-- **Responsive Design**: Adapts to different window sizes
-- **Material Design**: Clean, modern Vuetify components
-- **Color-Coded Data**: Visual indicators for status and values
-
-#### Keyboard Shortcuts
-
-Efficient navigation and actions via keyboard.
-
-**Navigation:**
-
-- `Ctrl/Cmd + 1` - Dashboard
-- `Ctrl/Cmd + 2` - Accounts
-- `Ctrl/Cmd + 3` - Transfers
-
-**Actions:**
-
-- `Ctrl/Cmd + R` - Refresh data
-- `Ctrl/Cmd + F` - Focus search
-- `Ctrl/Cmd + E` - Export/Backup
-- `Ctrl/Cmd + D` - Toggle dark mode
-- `Ctrl/Cmd + K` - Show keyboard shortcuts
-
-### 📋 Data Display Features
-
-#### Smart Formatting
-
-- **BigInt Handling**: Safe handling of 128-bit integers
-- **Currency Display**: Automatic currency symbol and decimal formatting
-- **Timestamp Formatting**: Human-readable dates and times
-- **Number Formatting**: Thousands separators and proper decimals
-- **Balance Colors**: Green for positive, red for negative
-
-#### Tables & Lists
-
-- **Pagination**: Handle large datasets efficiently
-- **Sorting**: Sort by any column
-- **Column Visibility**: Show/hide columns
-- **Row Selection**: Select multiple items for bulk actions
-- **Quick Actions**: Context menus for common operations
-- **Expandable Rows**: View detailed information inline
-
-#### Real-Time Updates
-
-- **Auto-Refresh**: Configurable automatic data refresh
-- **Live Counters**: Real-time statistics updates
-- **Change Indicators**: Highlight new or modified records
-- **Refresh Control**: Manual refresh with loading states
-
-###  Data Integrity
-
-#### Validation
-
-- **Input Validation**: Validate all user inputs before submission
-- **BigInt Safety**: Prevent overflow and precision loss
-- **Required Fields**: Enforce mandatory fields
-- **Format Checking**: Validate IDs, amounts, and codes
-- **Duplicate Prevention**: Check for duplicate IDs
-
-#### Error Handling
-
-- **User-Friendly Messages**: Clear error descriptions
-- **Error Recovery**: Graceful handling of failures
-- **Retry Logic**: Automatic retry for transient errors
-- **Error Logging**: Track errors for debugging
-
-###  Performance Features
-
-#### Optimization
-
-- **Lazy Loading**: Load data on demand
-- **Virtual Scrolling**: Handle large lists efficiently
-- **Caching**: Cache frequently accessed data
-- **Batch Operations**: Process multiple items together
-- **Debounced Search**: Reduce unnecessary queries
-
-#### Limits
-
-- **TigerBeetle Limits**: Respects 8,189 item batch limit
-- **Pagination**: Default 25-100 items per page
-- **Query Limits**: Configurable result limits
-- **Memory Management**: Efficient data handling
+The connection is stored locally in SQLite under Electron's `userData`
+directory and restored on next launch.
 
 ---
 
-##  Use Cases
+## Architecture
 
-### Financial Applications
+```
+Vue renderer  ──window.tigerBeetleApi──▶  preload (contextBridge)
+                                              │  ipcRenderer.invoke
+                                              ▼
+                                        Electron main
+                                              ├──▶ tigerbeetle-node client
+                                              └──▶ better-sqlite3 (local sidecar)
+```
 
-- **Banking Systems**: Manage customer accounts and transactions
-- **Payment Processing**: Handle payment transfers with two-phase commit
-- **Accounting**: Track debits, credits, and balances
-- **Multi-Currency**: Support international transactions
+TigerBeetle stores no names, so the SQLite sidecar holds **aliases and
+connection config only**. It is a local convenience cache, never a source of
+financial truth. Deleting an account in the UI removes only its local alias —
+TigerBeetle is immutable and the account itself remains.
 
-### Development & Testing
+Key paths:
 
-- **Database Inspection**: View and analyze TigerBeetle data
-- **Testing**: Create test accounts and transfers
-- **Debugging**: Trace transaction flows and account states
-- **Performance Testing**: Monitor database performance
+| Path | Role |
+| --- | --- |
+| `electron/main.ts` | IPC handlers, TigerBeetle client, SQLite sidecar |
+| `electron/preload.ts` | The contextBridge API surface (the file vite builds) |
+| `src/types/window.d.ts` | The renderer-facing contract for that API |
+| `src/components/` | One Vue SFC per view |
+| `src/services/` | Backup, export, import, validation, crypto |
+| `src/utils/bigint.ts` | 128-bit amount/ID formatting and parsing |
 
-### Data Management
-
-- **Backup & Recovery**: Regular backups with encryption
-- **Data Migration**: Import/export data between environments
-- **Reporting**: Generate reports and visualizations
-- **Auditing**: Track all account and transfer activity
-
----
-
-##  Key Benefits
-
-### User Experience
-
-✅ **Intuitive Interface** - Clean, modern design with Material Design  
-✅ **Fast Navigation** - Keyboard shortcuts for power users  
-✅ **Visual Feedback** - Real-time updates and loading states  
-✅ **Error Prevention** - Validation and confirmation dialogs
-
-### Data Management
-
-✅ **Multi-Currency** - Support for 13+ currencies plus custom  
-✅ **Bulk Operations** - Import/export thousands of records  
-✅ **Data Integrity** - Validation and duplicate detection  
-✅ **Secure Backups** - AES-256 encryption
-
-### Performance
-
-✅ **Efficient Queries** - Optimized database access  
-✅ **Batch Processing** - Handle large datasets  
-✅ **Caching** - Reduce database load  
-✅ **Responsive** - Fast UI updates
-
-### Developer-Friendly
-
-✅ **Open Source** - MIT License  
-✅ **TypeScript** - Type-safe codebase  
-✅ **Modern Stack** - Vue 3, Electron, Vite  
-✅ **Extensible** - Easy to add features
+`electron/preload.ts` and `src/types/window.d.ts` must be kept in step by hand —
+there is no code generation between them.
 
 ---
 
-## 🔄 Workflow Examples
+## Features
 
-### Creating an Account
+### Dashboard
+Summary counters, top accounts by balance, per-ledger breakdown and recent
+activity. Counters reflect the **page that was fetched**, not a grand total —
+TigerBeetle has no cheap `COUNT(*)`.
 
-1. Navigate to Accounts view
-2. Click "Create Account"
-3. Enter account details (ID, ledger, code)
-4. Set initial balance (optional)
-5. Add user data fields (optional)
-6. Click "Create"
-7. Account appears in list immediately
+### Accounts
+Cursor-paginated table with expandable rows (pending amounts, user data,
+timestamp). Filter by ledger, code and date range. Create accounts with
+validation on the 128-bit ID, ledger and code ranges.
 
-### Making a Transfer
+### Transfers
+Same table and filter model as Accounts. Create single transfers with amount
+parsing that respects the ledger's configured decimal places.
 
-1. Navigate to Transfers view
-2. Click "Create Transfer"
-3. Enter transfer details:
-   - Debit account ID
-   - Credit account ID
-   - Amount
-   - Ledger and code
-4. Set flags (pending, linked, etc.)
-5. Click "Create"
-6. Transfer executes and balances update
+### Bulk Operations
+CSV/JSON preview and batch creation of accounts and transfers, with a dry-run
+mode.
 
-### Searching Data
+### Advanced Search
+Client-side search across fetched accounts and transfers, with case-sensitive
+and regex options plus a saved search history. Results are capped by
+TigerBeetle's 8,189-item batch limit.
 
-1. Navigate to Advanced Search
-2. Select entity type (Accounts/Transfers)
-3. Add filters:
-   - Ledger, code
-   - Amount/balance range
-   - Date range
-   - User data
-4. Click "Search"
-5. View results in table
-6. Export results if needed
+### Backup & Export
+- Export to JSON, CSV or SQL
+- Full backups with **AES-256-GCM** encryption (PBKDF2-SHA256, 100k iterations)
+- Import/restore with validation, dry-run and duplicate detection
+- Backup history (metadata only — the file itself is saved where you chose it)
 
-### Creating a Backup
+### Charts & Flow Visualizer
+Chart.js views for balance distribution and transfer activity, plus a canvas
+node graph of money movement between accounts with pan, zoom and selection.
 
-1. Navigate to Backup & Export
-2. Select backup options:
-   - Include accounts/transfers
-   - Encryption password
-   - Compression level
-3. Click "Create Backup"
-4. Save backup file
-5. Backup added to history
+### Ledgers & currencies
+Per-ledger currency with 12 presets — LYD, EGP, TND, SAR, AED, USD, EUR, GBP,
+JPY, BTC, ETH and a custom option — supporting 0–18 decimal places. All amounts
+are handled as `BigInt` end to end; formatting is decimal-aware, so a JPY
+(0-decimal) ledger and a BTC (8-decimal) ledger both render correctly.
 
----
+### Cluster Manager
+Save multiple cluster profiles locally and switch between them.
 
-## 📊 Technical Capabilities
+### Keyboard shortcuts
 
-### TigerBeetle Integration
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl/Cmd + 1` | Dashboard |
+| `Ctrl/Cmd + 2` | Accounts |
+| `Ctrl/Cmd + 3` | Transfers |
+| `Ctrl/Cmd + R` | Refresh connection status |
+| `Ctrl/Cmd + F` | Advanced Search |
+| `Ctrl/Cmd + E` | Backup & Export |
+| `Ctrl/Cmd + D` | Toggle dark mode |
+| `Ctrl/Cmd + K` or `/` | Show shortcuts |
 
-- **Native Client**: Uses official TigerBeetle Node.js client
-- **Full API Support**: All TigerBeetle operations supported
-- **BigInt Handling**: Proper 128-bit integer support
-- **Batch Operations**: Efficient bulk processing
-- **Error Handling**: Comprehensive error management
-
-### Data Storage
-
-- **Primary**: TigerBeetle database (remote)
-- **Sidecar**: SQLite database (local metadata)
-- **Cached**: In-memory caching for performance
-- **Backups**: Encrypted file-based backups
-
-### Cross-Platform
-
-- **macOS**: Native .dmg installer (Intel & Apple Silicon)
-- **Windows**: Native .exe installer
-- **Linux**: AppImage package
-- **Consistent**: Same features across all platforms
+Shortcuts are suppressed while you are typing in a field.
 
 ---
 
-<div align="center">
+## Not implemented yet
 
-**Built for the TigerBeetle Community**
+Called out so the feature list above stays honest:
 
-A powerful, user-friendly desktop application for managing TigerBeetle databases.
+- **Two-phase transfers** — `pending_id` and `timeout` are hardcoded to zero;
+  there is no post/void UI
+- **Linked transfer chains** — the template checkbox is metadata only; no
+  `flags` are sent
+- **`get_account_balances`** and **change events (CDC)** — not wired
+- **Imported events** — user-supplied timestamps are not supported
+- **Batching** — creates submit one item per call rather than filling a batch
+- **Auto-refresh / live updates** — only a 10s connection health check; tables
+  refresh on demand
+- **Auto-reconnect** on connection loss
+- **Server-side sorting** — column sort reorders the current page only
+- **Code signing, notarization and auto-update** — installers are unsigned
+- **Tests and CI** — there is no test suite yet
 
-</div>
+Disconnecting drops the client reference without calling `client.destroy()`.
+
+---
+
+## Contributing
+
+Type-check before opening a PR:
+
+```bash
+npx vue-tsc --noEmit
+```
+
+`tsconfig.json` runs with `strict`, `noUnusedLocals` and `noUnusedParameters`
+enabled, and the tree is currently clean — please keep it that way.
+
+## License
+
+[MIT](LICENSE)

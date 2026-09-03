@@ -420,7 +420,7 @@ function parseAccountsCSV() {
     const lines = text.split("\n").filter((line) => line.trim());
     const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
 
-    accountsPreview.value = lines.slice(1).map((line, index) => {
+    accountsPreview.value = lines.slice(1).map((line) => {
       const values = line.split(",").map((v) => v.trim().replace(/"/g, ""));
       const account: any = {};
 
@@ -462,7 +462,7 @@ function parseTransfersCSV() {
     const lines = text.split("\n").filter((line) => line.trim());
     const headers = lines[0].split(",").map((h) => h.trim().replace(/"/g, ""));
 
-    transfersPreview.value = lines.slice(1).map((line, index) => {
+    transfersPreview.value = lines.slice(1).map((line) => {
       const values = line.split(",").map((v) => v.trim().replace(/"/g, ""));
       const transfer: any = {};
 

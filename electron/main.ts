@@ -37,26 +37,10 @@ interface TransferData {
   flags?: number;
 }
 
-interface AccountRecord {
-  id: string;
-  alias: string;
-  ledger: number;
-  code: number;
-  created_at: number;
-}
-
-interface TransferRecord {
-  id: string;
-  debit_account_id: string;
-  credit_account_id: string;
-  amount: string;
-  ledger: number;
-  code: number;
-  created_at: number;
-}
-
 let mainWindow: BrowserWindow | null = null;
 let tigerBeetleClient: any = null;
+const MAX_BATCH_SIZE = 8189;
+
 let localDb: Database.Database | null = null;
 const isDev = !app.isPackaged;
 
@@ -226,28 +210,6 @@ function getStoredConnectionConfig(): ConnectionConfig | null {
   return null;
 }
 
-function serializeBigInt(obj: any): any {
-  if (obj === null || obj === undefined) return obj;
-
-  if (typeof obj === "bigint") {
-    return obj.toString();
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(serializeBigInt);
-  }
-
-  if (typeof obj === "object") {
-    const serialized: any = {};
-    for (const key in obj) {
-      serialized[key] = serializeBigInt(obj[key]);
-    }
-    return serialized;
-  }
-
-  return obj;
-}
-
 function deserializeBigInt(
   value: string | undefined,
   defaultValue: bigint = 0n,
@@ -331,7 +293,7 @@ async function createAccount(data: AccountData) {
 
     return {
       success: true,
-      id: accountId.toString(),
+      data: { id: accountId.toString() },
     };
   } catch (error: any) {
     throw error;
@@ -371,88 +333,6 @@ async function queryAccountsFromTigerBeetle(
   }
 }
 
-// Cache for account/transfer counts to avoid repeated full scans
-const countCache = {
-  accounts: { value: 0, timestamp: 0 },
-  transfers: { value: 0, timestamp: 0 },
-};
-
-// Get cached count or fetch if stale (> 5 seconds)
-async function getCachedAccountCount(): Promise<number> {
-  const now = Date.now();
-  if (
-    countCache.accounts.timestamp &&
-    now - countCache.accounts.timestamp < 5000
-  ) {
-    return countCache.accounts.value;
-  }
-
-  // Fetch just one item to get total count
-  const sample = await queryAccountsFromTigerBeetle(1, 0, 0, true, 0n);
-  // In production, TigerBeetle should return total count in metadata
-  // For now, we need to fetch all to get count (but cache it)
-  const all = await fetchAllAccountsFromTigerBeetle(1);
-  countCache.accounts.value = all.length;
-  countCache.accounts.timestamp = now;
-  return all.length;
-}
-
-async function getCachedTransferCount(): Promise<number> {
-  const now = Date.now();
-  if (
-    countCache.transfers.timestamp &&
-    now - countCache.transfers.timestamp < 5000
-  ) {
-    return countCache.transfers.value;
-  }
-
-  const all = await fetchAllTransfersFromTigerBeetle(1);
-  countCache.transfers.value = all.length;
-  countCache.transfers.timestamp = now;
-  return all.length;
-}
-
-async function fetchAllAccountsFromTigerBeetle(ledger?: number, code?: number) {
-  if (!tigerBeetleClient) {
-    throw new Error("Not connected to TigerBeetle");
-  }
-
-  const allAccounts: any[] = [];
-  let timestamp_min = 0n;
-  const batchSize = 8189;
-  let batchCount = 0;
-
-  try {
-    while (true) {
-      batchCount++;
-      const batch = await queryAccountsFromTigerBeetle(
-        batchSize,
-        ledger,
-        code,
-        false,
-        timestamp_min,
-      );
-
-      if (batch.length === 0) {
-        break;
-      }
-
-      allAccounts.push(...batch);
-
-      if (batch.length < batchSize) {
-        break;
-      }
-
-      const lastAccount = batch[batch.length - 1];
-      timestamp_min = (lastAccount as any).timestamp + 1n;
-    }
-
-    return allAccounts;
-  } catch (error: any) {
-    throw error;
-  }
-}
-
 async function queryTransfersFromTigerBeetle(
   limit: number = 100,
   ledger?: number,
@@ -486,51 +366,6 @@ async function queryTransfersFromTigerBeetle(
   }
 }
 
-async function fetchAllTransfersFromTigerBeetle(
-  ledger?: number,
-  code?: number,
-) {
-  if (!tigerBeetleClient) {
-    throw new Error("Not connected to TigerBeetle");
-  }
-
-  const allTransfers: any[] = [];
-  let timestamp_max = 0n;
-  const batchSize = 8189;
-  let batchCount = 0;
-
-  try {
-    while (true) {
-      batchCount++;
-      const batch = await queryTransfersFromTigerBeetle(
-        batchSize,
-        ledger,
-        code,
-        true,
-        0n,
-        timestamp_max,
-      );
-
-      if (batch.length === 0) {
-        break;
-      }
-
-      allTransfers.push(...batch);
-
-      if (batch.length < batchSize) {
-        break;
-      }
-
-      const lastTransfer = batch[batch.length - 1];
-      timestamp_max = (lastTransfer as any).timestamp - 1n;
-    }
-
-    return allTransfers;
-  } catch (error: any) {
-    throw error;
-  }
-}
-
 async function getAccounts(
   limit: number = 50,
   cursor: string | null = null,
@@ -547,8 +382,9 @@ async function getAccounts(
   }
 
   try {
-    // Fetch one extra item to determine if there are more results
-    const fetchLimit = limit + 1;
+    // Fetch one extra item to determine if there are more results,
+    // staying within TigerBeetle's maximum batch size.
+    const fetchLimit = Math.min(limit + 1, MAX_BATCH_SIZE);
 
     // Parse cursor (timestamp) or use defaults
     let timestamp_min = 0n;
@@ -761,6 +597,48 @@ async function lookupTransfersByIds(ids: string[]) {
   }
 }
 
+async function getAccountTransfers(accountId: string, limit: number = 100) {
+  if (!tigerBeetleClient) {
+    throw new Error("Not connected to TigerBeetle");
+  }
+
+  try {
+    const filter = {
+      account_id: BigInt(accountId),
+      user_data_128: 0n,
+      user_data_64: 0n,
+      user_data_32: 0,
+      code: 0,
+      timestamp_min: 0n,
+      timestamp_max: 0n,
+      limit: Math.min(limit, MAX_BATCH_SIZE),
+      // AccountFilterFlags: debits(1) | credits(2) | reversed(4)
+      // Both sides of the account, newest first.
+      flags: 1 | 2 | 4,
+    };
+
+    const transfers = await tigerBeetleClient.getAccountTransfers(filter);
+
+    return transfers.map((tbTransfer: any) => ({
+      id: tbTransfer.id.toString(),
+      debit_account_id: tbTransfer.debit_account_id.toString(),
+      credit_account_id: tbTransfer.credit_account_id.toString(),
+      amount: tbTransfer.amount.toString(),
+      pending_id: tbTransfer.pending_id.toString(),
+      user_data_128: tbTransfer.user_data_128.toString(),
+      user_data_64: tbTransfer.user_data_64.toString(),
+      user_data_32: tbTransfer.user_data_32,
+      timeout: tbTransfer.timeout,
+      ledger: tbTransfer.ledger,
+      code: tbTransfer.code,
+      flags: tbTransfer.flags,
+      timestamp: tbTransfer.timestamp.toString(),
+    }));
+  } catch (error: any) {
+    throw error;
+  }
+}
+
 async function queryAccountsWithFilter(filter: any) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -910,7 +788,7 @@ async function createTransfer(data: TransferData) {
 
     return {
       success: true,
-      id: transferId.toString(),
+      data: { id: transferId.toString() },
     };
   } catch (error: any) {
     throw error;
@@ -933,8 +811,9 @@ async function getTransfers(
   }
 
   try {
-    // Fetch one extra item to determine if there are more results
-    const fetchLimit = limit + 1;
+    // Fetch one extra item to determine if there are more results,
+    // staying within TigerBeetle's maximum batch size.
+    const fetchLimit = Math.min(limit + 1, MAX_BATCH_SIZE);
 
     // Parse cursor (timestamp) or use defaults
     let timestamp_min = 0n;
@@ -1156,6 +1035,18 @@ function setupIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  ipcMain.handle(
+    "get-account-transfers",
+    async (_event, accountId: string, limit?: number) => {
+      try {
+        const result = await getAccountTransfers(accountId, limit ?? 100);
+        return { success: true, data: result };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+  );
 
   ipcMain.handle("query-accounts", async (_event, filter: any) => {
     try {

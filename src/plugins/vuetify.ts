@@ -108,6 +108,23 @@ const defaults = {
 };
 
 
+const themeVariables = {
+  'border-radius-root': '4px',
+  'heading-font-family': 'inherit',
+  'body-font-family': 'inherit',
+  'h1-letter-spacing': '-0.015625em',
+  'h2-letter-spacing': '-0.0083333333em',
+  'h3-letter-spacing': 'normal',
+  'h4-letter-spacing': '0.0025em',
+  'h5-letter-spacing': 'normal',
+  'h6-letter-spacing': '0.0125em',
+  'h1-weight': '700',
+  'h2-weight': '700',
+  'h3-weight': '600',
+  'h4-weight': '600',
+  'btn-text-transform': 'none',
+};
+
 export default createVuetify({
   components,
   directives,
@@ -120,33 +137,10 @@ export default createVuetify({
     },
   },
   theme: {
-    defaultTheme: "dark", 
+    defaultTheme: "dark",
     themes: {
-      light: lightTheme,
-      dark: darkTheme,
-    },
-
-    variables: {
-
-      'border-radius-root': '4px', 
-
-      'heading-font-family': 'inherit',
-      'body-font-family': 'inherit',
-      
-
-      'h1-letter-spacing': '-0.015625em',
-      'h2-letter-spacing': '-0.0083333333em',
-      'h3-letter-spacing': 'normal',
-      'h4-letter-spacing': '0.0025em',
-      'h5-letter-spacing': 'normal',
-      'h6-letter-spacing': '0.0125em',
-
-      'h1-weight': '700',
-      'h2-weight': '700',
-      'h3-weight': '600',
-      'h4-weight': '600',
-      
-      'btn-text-transform': 'none',
+      light: { ...lightTheme, variables: themeVariables },
+      dark: { ...darkTheme, variables: themeVariables },
     },
   },
 });

@@ -40,7 +40,10 @@ export class BackupService {
         onProgress?.(60, "Including configuration...");
         const config = await window.tigerBeetleApi.getConnectionConfig();
         if (config) {
-          backup.config = config;
+          backup.config = {
+            clusterID: config.cluster_id,
+            replicaAddresses: config.replica_addresses,
+          };
         }
       }
 
@@ -213,16 +216,6 @@ export class BackupService {
     }
 
     return allTransfers;
-  }
-
-  private static extractData<T>(data: any): T[] {
-    if (Array.isArray(data)) {
-      return data;
-    }
-    if (data && typeof data === "object" && "data" in data) {
-      return Array.isArray(data.data) ? data.data : [];
-    }
-    return [];
   }
 
   private static downloadBlob(blob: Blob, filename: string): void {
