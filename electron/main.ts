@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { app, BrowserWindow, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
-import { createClient, id as createId } from "tigerbeetle-node";
+import { amount_max, createClient, id as createId } from "tigerbeetle-node";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,11 +35,73 @@ interface TransferData {
   user_data_64?: string;
   user_data_32?: number;
   flags?: number;
+  pending_id?: string;
+  timeout?: number;
 }
 
 let mainWindow: BrowserWindow | null = null;
 let tigerBeetleClient: any = null;
-const MAX_BATCH_SIZE = 8189;
+/**
+ * TigerBeetle caps a request by message size, not item count. The widely quoted
+ * 8189 assumes a 1MiB message body; a default cluster uses 32KiB, which is 253
+ * items of 128 bytes. Asking for more fails with "Too much data provided on
+ * this batch", so start from the default and let writes discover the real
+ * ceiling. Override with TB_BATCH_LIMIT when running a cluster tuned for larger
+ * messages.
+ */
+const DEFAULT_BATCH_LIMIT = 253;
+const MAX_BATCH_SIZE = Number(process.env.TB_BATCH_LIMIT) || DEFAULT_BATCH_LIMIT;
+
+// Shrinks if the cluster rejects a batch; never grows, so one discovery per run.
+let batchLimit = MAX_BATCH_SIZE;
+
+function isBatchTooLarge(error: any): boolean {
+  return /too much data/i.test(error?.message ?? "");
+}
+
+/**
+ * Submit one chunk, halving the session batch limit and retrying if the cluster
+ * says the request was too big.
+ */
+async function submitWithBackoff<T>(
+  chunk: T[],
+  submit: (items: T[]) => Promise<any[]>,
+): Promise<{ errors: any[]; accepted: number }> {
+  try {
+    return { errors: await submit(chunk), accepted: chunk.length };
+  } catch (error: any) {
+    if (!isBatchTooLarge(error) || chunk.length <= 1) throw error;
+    batchLimit = Math.max(1, Math.floor(chunk.length / 2));
+    return { errors: [], accepted: 0 };
+  }
+}
+
+const AccountFlags = {
+  linked: 1,
+  debits_must_not_exceed_credits: 2,
+  credits_must_not_exceed_debits: 4,
+  history: 8,
+  imported: 16,
+  closed: 32,
+} as const;
+
+const AccountFilterFlags = {
+  debits: 1,
+  credits: 2,
+  reversed: 4,
+} as const;
+
+const TransferFlags = {
+  linked: 1,
+  pending: 2,
+  post_pending_transfer: 4,
+  void_pending_transfer: 8,
+  balancing_debit: 16,
+  balancing_credit: 32,
+  closing_debit: 64,
+  closing_credit: 128,
+  imported: 256,
+} as const;
 
 let localDb: Database.Database | null = null;
 const isDev = !app.isPackaged;
@@ -223,23 +285,15 @@ function deserializeBigInt(
 }
 
 function decodeAccountFlags(flags: number): string[] {
-  const result: string[] = [];
-  if (flags & 0x01) result.push("linked");
-  if (flags & 0x02) result.push("debits_must_not_exceed_credits");
-  if (flags & 0x04) result.push("credits_must_not_exceed_debits");
-  if (flags & 0x08) result.push("history");
-  return result;
+  return Object.entries(AccountFlags)
+    .filter(([, bit]) => (flags & bit) !== 0)
+    .map(([name]) => name);
 }
 
 function decodeTransferFlags(flags: number): string[] {
-  const result: string[] = [];
-  if (flags & 0x01) result.push("linked");
-  if (flags & 0x02) result.push("pending");
-  if (flags & 0x04) result.push("post_pending_transfer");
-  if (flags & 0x08) result.push("void_pending_transfer");
-  if (flags & 0x10) result.push("balancing_debit");
-  if (flags & 0x20) result.push("balancing_credit");
-  return result;
+  return Object.entries(TransferFlags)
+    .filter(([, bit]) => (flags & bit) !== 0)
+    .map(([name]) => name);
 }
 
 async function createAccount(data: AccountData) {
@@ -323,7 +377,6 @@ async function queryAccountsFromTigerBeetle(
       timestamp_max: timestamp_max,
       limit: limit,
       flags: reversed ? 1 : 0,
-      reserved: new Uint8Array(6),
     };
 
     const accounts = await tigerBeetleClient.queryAccounts(filter);
@@ -356,7 +409,6 @@ async function queryTransfersFromTigerBeetle(
       timestamp_max: timestamp_max,
       limit: limit,
       flags: reversed ? 1 : 0,
-      reserved: new Uint8Array(6),
     };
 
     const transfers = await tigerBeetleClient.queryTransfers(filter);
@@ -382,9 +434,12 @@ async function getAccounts(
   }
 
   try {
-    // Fetch one extra item to determine if there are more results,
-    // staying within TigerBeetle's maximum batch size.
-    const fetchLimit = Math.min(limit + 1, MAX_BATCH_SIZE);
+    // Fetch one extra item to determine if there are more results. The page
+    // size is clamped so limit+1 still fits one message: otherwise the cluster
+    // silently returns fewer rows and `hasMore` reads as false while more data
+    // exists.
+    const effectiveLimit = Math.min(limit, batchLimit - 1);
+    const fetchLimit = effectiveLimit + 1;
 
     // Parse cursor (timestamp) or use defaults
     let timestamp_min = 0n;
@@ -417,7 +472,7 @@ async function getAccounts(
       timestamp_max,
     );
 
-    const hasMore = accounts.length > limit;
+    const hasMore = accounts.length > effectiveLimit;
     const hasPrevious = cursor !== null;
 
     const resultAccounts = hasMore ? accounts.slice(0, -1) : accounts;
@@ -612,9 +667,11 @@ async function getAccountTransfers(accountId: string, limit: number = 100) {
       timestamp_min: 0n,
       timestamp_max: 0n,
       limit: Math.min(limit, MAX_BATCH_SIZE),
-      // AccountFilterFlags: debits(1) | credits(2) | reversed(4)
       // Both sides of the account, newest first.
-      flags: 1 | 2 | 4,
+      flags:
+        AccountFilterFlags.debits |
+        AccountFilterFlags.credits |
+        AccountFilterFlags.reversed,
     };
 
     const transfers = await tigerBeetleClient.getAccountTransfers(filter);
@@ -639,6 +696,27 @@ async function getAccountTransfers(accountId: string, limit: number = 100) {
   }
 }
 
+function attachAliases<T extends { id: string }>(rows: T[]) {
+  if (!localDb || rows.length === 0) return rows;
+
+  const ids = [...new Set(rows.map((row) => row.id))];
+  const placeholders = ids.map(() => "?").join(",");
+
+  try {
+    const found = localDb
+      .prepare(`SELECT id, alias FROM accounts WHERE id IN (${placeholders})`)
+      .all(...ids) as { id: string; alias: string }[];
+    const lookup = new Map(found.map((row) => [row.id, row.alias]));
+
+    return rows.map((row) => ({
+      ...row,
+      alias: lookup.get(row.id) ?? `Account ${row.id.slice(0, 8)}...`,
+    }));
+  } catch {
+    return rows;
+  }
+}
+
 async function queryAccountsWithFilter(filter: any) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
@@ -653,9 +731,8 @@ async function queryAccountsWithFilter(filter: any) {
       code: filter.code || 0,
       timestamp_min: filter.timestamp_min ? BigInt(filter.timestamp_min) : 0n,
       timestamp_max: filter.timestamp_max ? BigInt(filter.timestamp_max) : 0n,
-      limit: Math.min(filter.limit || 8189, 8189),
+      limit: Math.min(filter.limit || batchLimit, batchLimit),
       flags: filter.reversed ? 1 : 0,
-      reserved: new Uint8Array(6),
     };
 
     const accounts = await tigerBeetleClient.queryAccounts(queryFilter);
@@ -684,7 +761,7 @@ async function queryAccountsWithFilter(filter: any) {
       };
     });
 
-    return result;
+    return attachAliases(result);
   } catch (error: any) {
     throw error;
   }
@@ -704,9 +781,8 @@ async function queryTransfersWithFilter(filter: any) {
       code: filter.code || 0,
       timestamp_min: filter.timestamp_min ? BigInt(filter.timestamp_min) : 0n,
       timestamp_max: filter.timestamp_max ? BigInt(filter.timestamp_max) : 0n,
-      limit: Math.min(filter.limit || 8189, 8189),
+      limit: Math.min(filter.limit || batchLimit, batchLimit),
       flags: filter.reversed ? 1 : 0,
-      reserved: new Uint8Array(6),
     };
 
     const transfers = await tigerBeetleClient.queryTransfers(queryFilter);
@@ -746,11 +822,11 @@ async function createTransfer(data: TransferData) {
       debit_account_id: deserializeBigInt(data.debit_account_id),
       credit_account_id: deserializeBigInt(data.credit_account_id),
       amount: deserializeBigInt(data.amount),
-      pending_id: 0n,
+      pending_id: deserializeBigInt(data.pending_id),
       user_data_128: deserializeBigInt(data.user_data_128),
       user_data_64: deserializeBigInt(data.user_data_64),
       user_data_32: data.user_data_32 || 0,
-      timeout: 0,
+      timeout: data.timeout || 0,
       ledger: data.ledger,
       code: data.code,
       flags: data.flags || 0,
@@ -795,6 +871,282 @@ async function createTransfer(data: TransferData) {
   }
 }
 
+function buildTransfer(data: TransferData) {
+  return {
+    id: data.id ? deserializeBigInt(data.id) : createId(),
+    debit_account_id: deserializeBigInt(data.debit_account_id),
+    credit_account_id: deserializeBigInt(data.credit_account_id),
+    amount: deserializeBigInt(data.amount),
+    pending_id: deserializeBigInt(data.pending_id),
+    user_data_128: deserializeBigInt(data.user_data_128),
+    user_data_64: deserializeBigInt(data.user_data_64),
+    user_data_32: data.user_data_32 || 0,
+    timeout: data.timeout || 0,
+    ledger: data.ledger,
+    code: data.code,
+    flags: data.flags || 0,
+    timestamp: 0n,
+  };
+}
+
+/**
+ * Take the next batch from `items`, at most `limit` long and never cutting a
+ * linked chain: TigerBeetle applies `linked` only within a single request, so a
+ * chain split across two requests would lose its atomicity. A chain longer than
+ * the limit cannot be sent at all, which is reported rather than silently split.
+ */
+function nextChunk<T>(
+  items: T[],
+  start: number,
+  limit: number,
+  isLinked: (item: T) => boolean,
+): T[] {
+  let end = Math.min(start + limit, items.length);
+
+  // Walk back to the end of the last complete chain.
+  while (end > start && isLinked(items[end - 1])) end--;
+
+  if (end === start) {
+    let chainEnd = start;
+    while (chainEnd < items.length && isLinked(items[chainEnd])) chainEnd++;
+    throw new Error(
+      `Linked chain of ${chainEnd - start + 1} items exceeds this cluster's ` +
+        `batch limit of ${limit}. Linked transfers must fit in one request.`,
+    );
+  }
+
+  return items.slice(start, end);
+}
+
+/**
+ * Send every item, re-splitting if the cluster rejects a request as too large.
+ * Returns per-item failures with indexes into the original list.
+ */
+async function submitInBatches<T>(
+  items: T[],
+  isLinked: (item: T) => boolean,
+  submit: (chunk: T[]) => Promise<any[]>,
+  idOf: (item: T) => string,
+) {
+  const failures: { index: number; id: string; result: unknown }[] = [];
+  let offset = 0;
+
+  while (offset < items.length) {
+    const chunk = nextChunk(items, offset, batchLimit, isLinked);
+    const { errors, accepted } = await submitWithBackoff(chunk, submit);
+
+    // accepted === 0 means the limit shrank; retry the same items.
+    if (accepted === 0) continue;
+
+    for (const err of errors) {
+      failures.push({
+        index: offset + err.index,
+        id: idOf(chunk[err.index]),
+        result: err.result,
+      });
+    }
+    offset += accepted;
+  }
+
+  return failures;
+}
+
+async function createAccountsBatch(items: AccountData[]) {
+  if (!tigerBeetleClient) {
+    throw new Error("Not connected to TigerBeetle");
+  }
+
+  const accounts = items.map((data) => ({
+    id: data.id ? deserializeBigInt(data.id) : createId(),
+    debits_pending: 0n,
+    debits_posted: 0n,
+    credits_pending: 0n,
+    credits_posted: 0n,
+    user_data_128: deserializeBigInt(data.user_data_128),
+    user_data_64: deserializeBigInt(data.user_data_64),
+    user_data_32: data.user_data_32 || 0,
+    reserved: 0,
+    ledger: data.ledger,
+    code: data.code,
+    flags: data.flags || 0,
+    timestamp: 0n,
+  }));
+
+  const failures = await submitInBatches(
+    accounts,
+    (a) => (a.flags & AccountFlags.linked) !== 0,
+    (chunk) => tigerBeetleClient.createAccounts(chunk),
+    (a) => a.id.toString(),
+  );
+
+  const failedIndexes = new Set(failures.map((f) => f.index));
+  if (localDb) {
+    const stmt = localDb.prepare(`
+      INSERT OR REPLACE INTO accounts (id, alias, ledger, code, user_data_128, user_data_64, user_data_32)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertAll = localDb.transaction(() => {
+      accounts.forEach((account, i) => {
+        if (failedIndexes.has(i)) return;
+        stmt.run(
+          account.id.toString(),
+          items[i].alias || `Account ${account.id.toString().slice(0, 8)}...`,
+          items[i].ledger,
+          items[i].code,
+          items[i].user_data_128 || null,
+          items[i].user_data_64 || null,
+          items[i].user_data_32 || null,
+        );
+      });
+    });
+    try {
+      insertAll();
+    } catch (err) {}
+  }
+
+  return {
+    requested: accounts.length,
+    created: accounts.length - failures.length,
+    ids: accounts.map((a) => a.id.toString()),
+    failures,
+  };
+}
+
+async function createTransfersBatch(items: TransferData[]) {
+  if (!tigerBeetleClient) {
+    throw new Error("Not connected to TigerBeetle");
+  }
+
+  const transfers = items.map(buildTransfer);
+  const failures = await submitInBatches(
+    transfers,
+    (t) => (t.flags & TransferFlags.linked) !== 0,
+    (chunk) => tigerBeetleClient.createTransfers(chunk),
+    (t) => t.id.toString(),
+  );
+
+  const failedIndexes = new Set(failures.map((f) => f.index));
+  if (localDb) {
+    const stmt = localDb.prepare(`
+      INSERT OR REPLACE INTO transfers (id, debit_account_id, credit_account_id, amount, ledger, code, user_data_128, user_data_64, user_data_32)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertAll = localDb.transaction(() => {
+      transfers.forEach((transfer, i) => {
+        if (failedIndexes.has(i)) return;
+        stmt.run(
+          transfer.id.toString(),
+          transfer.debit_account_id.toString(),
+          transfer.credit_account_id.toString(),
+          transfer.amount.toString(),
+          transfer.ledger,
+          transfer.code,
+          items[i].user_data_128 || null,
+          items[i].user_data_64 || null,
+          items[i].user_data_32 || null,
+        );
+      });
+    });
+    try {
+      insertAll();
+    } catch (err) {}
+  }
+
+  return {
+    requested: transfers.length,
+    created: transfers.length - failures.length,
+    ids: transfers.map((t) => t.id.toString()),
+    failures,
+  };
+}
+
+/**
+ * Resolve a two-phase transfer. `amount` omitted posts the full pending amount
+ * via the amount_max sentinel; a smaller value posts partially and voids the
+ * remainder. Voiding always carries amount 0.
+ */
+async function resolvePendingTransfer(
+  pendingId: string,
+  action: "post" | "void",
+  amount?: string,
+) {
+  if (!tigerBeetleClient) {
+    throw new Error("Not connected to TigerBeetle");
+  }
+
+  const pending = await tigerBeetleClient.lookupTransfers([BigInt(pendingId)]);
+  if (pending.length === 0) {
+    throw new Error(`Pending transfer ${pendingId} not found`);
+  }
+
+  const original = pending[0];
+  if ((original.flags & TransferFlags.pending) === 0) {
+    throw new Error(`Transfer ${pendingId} is not a pending transfer`);
+  }
+
+  const resolution = {
+    id: createId(),
+    // Left zero: TigerBeetle takes the accounts from the pending transfer.
+    debit_account_id: 0n,
+    credit_account_id: 0n,
+    amount: action === "void" ? 0n : amount ? BigInt(amount) : amount_max,
+    pending_id: original.id,
+    user_data_128: 0n,
+    user_data_64: 0n,
+    user_data_32: 0,
+    timeout: 0,
+    ledger: original.ledger,
+    code: original.code,
+    flags:
+      action === "post"
+        ? TransferFlags.post_pending_transfer
+        : TransferFlags.void_pending_transfer,
+    timestamp: 0n,
+  };
+
+  const errors = await tigerBeetleClient.createTransfers([resolution]);
+  if (errors.length > 0) {
+    throw new Error(
+      `Failed to ${action} pending transfer: ${JSON.stringify(errors[0])}`,
+    );
+  }
+
+  return { id: resolution.id.toString(), pending_id: pendingId, action };
+}
+
+/**
+ * Balance history for an account. Requires the account to have been created
+ * with the `history` flag; without it TigerBeetle returns nothing.
+ */
+async function getAccountBalances(accountId: string, limit: number = 100) {
+  if (!tigerBeetleClient) {
+    throw new Error("Not connected to TigerBeetle");
+  }
+
+  const filter = {
+    account_id: BigInt(accountId),
+    user_data_128: 0n,
+    user_data_64: 0n,
+    user_data_32: 0,
+    code: 0,
+    timestamp_min: 0n,
+    timestamp_max: 0n,
+    limit: Math.min(limit, MAX_BATCH_SIZE),
+    flags: AccountFilterFlags.debits | AccountFilterFlags.credits,
+  };
+
+  const balances = await tigerBeetleClient.getAccountBalances(filter);
+
+  return balances.map((b: any) => ({
+    debits_pending: b.debits_pending.toString(),
+    debits_posted: b.debits_posted.toString(),
+    credits_pending: b.credits_pending.toString(),
+    credits_posted: b.credits_posted.toString(),
+    balance: (b.credits_posted - b.debits_posted).toString(),
+    timestamp: b.timestamp.toString(),
+  }));
+}
+
 async function getTransfers(
   limit: number = 50,
   cursor: string | null = null,
@@ -811,9 +1163,12 @@ async function getTransfers(
   }
 
   try {
-    // Fetch one extra item to determine if there are more results,
-    // staying within TigerBeetle's maximum batch size.
-    const fetchLimit = Math.min(limit + 1, MAX_BATCH_SIZE);
+    // Fetch one extra item to determine if there are more results. The page
+    // size is clamped so limit+1 still fits one message: otherwise the cluster
+    // silently returns fewer rows and `hasMore` reads as false while more data
+    // exists.
+    const effectiveLimit = Math.min(limit, batchLimit - 1);
+    const fetchLimit = effectiveLimit + 1;
 
     // Parse cursor (timestamp) or use defaults
     let timestamp_min = 0n;
@@ -850,7 +1205,7 @@ async function getTransfers(
     );
 
     // Check if there are more results
-    const hasMore = transfers.length > limit;
+    const hasMore = transfers.length > effectiveLimit;
     const hasPrevious = cursor !== null;
 
     // Remove the extra item if we have more
@@ -1037,6 +1392,66 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle(
+    "get-account-balances",
+    async (_event, accountId: string, limit?: number) => {
+      try {
+        const result = await getAccountBalances(accountId, limit ?? 100);
+        return { success: true, data: result };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "create-accounts-batch",
+    async (_event, items: AccountData[]) => {
+      try {
+        const result = await createAccountsBatch(items);
+        return { success: true, data: result };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "create-transfers-batch",
+    async (_event, items: TransferData[]) => {
+      try {
+        const result = await createTransfersBatch(items);
+        return { success: true, data: result };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "post-pending-transfer",
+    async (_event, pendingId: string, amount?: string) => {
+      try {
+        const result = await resolvePendingTransfer(pendingId, "post", amount);
+        return { success: true, data: result };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "void-pending-transfer",
+    async (_event, pendingId: string) => {
+      try {
+        const result = await resolvePendingTransfer(pendingId, "void");
+        return { success: true, data: result };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+  );
+
+  ipcMain.handle(
     "get-account-transfers",
     async (_event, accountId: string, limit?: number) => {
       try {
@@ -1123,9 +1538,7 @@ function setupIpcHandlers() {
 }
 
 function createWindow() {
-  const preloadPath = isDev
-    ? path.join(__dirname, "preload.js")
-    : path.join(__dirname, "preload.js");
+  const preloadPath = path.join(__dirname, "preload.cjs");
 
   mainWindow = new BrowserWindow({
     width: 1200,

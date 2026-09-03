@@ -1,0 +1,51 @@
+# Local TigerBeetle cluster for development.
+#
+#   npm run db:up     format (first run only) and start the cluster
+#   npm run seed      load a demo dataset
+#   npm run db:down   stop the cluster (data is kept)
+#   npm run db:reset  stop and delete the data file
+#
+# Single replica with --development: no redundancy and relaxed fsync, which is
+# right for a laptop and wrong for anything real.
+#
+# seccomp:unconfined is required because TigerBeetle uses io_uring, which
+# Docker's default seccomp profile blocks ("error(io): io_uring is not
+# available"). This is a local development harness only.
+
+name: tigerbeetle-studio
+
+services:
+  format:
+    image: ghcr.io/tigerbeetle/tigerbeetle:0.16.65
+    volumes:
+      - tigerbeetle-data:/data
+    # The data file survives restarts, so only format when it is missing.
+    # List form avoids compose re-splitting the arguments.
+    security_opt:
+      - seccomp:unconfined
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        test -f /data/0_0.tigerbeetle ||
+        /tigerbeetle format --cluster=0 --replica=0 --replica-count=1
+        --development /data/0_0.tigerbeetle
+
+  tigerbeetle:
+    image: ghcr.io/tigerbeetle/tigerbeetle:0.16.65
+    depends_on:
+      format:
+        condition: service_completed_successfully
+    volumes:
+      - tigerbeetle-data:/data
+    ports:
+      - "3000:3000"
+    command:
+      ["start", "--addresses=0.0.0.0:3000", "--development", "/data/0_0.tigerbeetle"]
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - IPC_LOCK
+    restart: unless-stopped
+
+volumes:
+  tigerbeetle-data:

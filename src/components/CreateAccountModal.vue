@@ -79,7 +79,52 @@
             </v-col>
 
             <v-col cols="12">
-              <v-expansion-panels variant="accordion">
+              <v-expansion-panels variant="accordion" multiple>
+                <v-expansion-panel>
+                  <v-expansion-panel-title>
+                    <v-icon icon="mdi-flag" class="mr-2" />
+                    Account Flags
+                    <v-chip
+                      v-if="selectedFlags.length"
+                      size="x-small"
+                      color="primary"
+                      class="ml-2"
+                    >
+                      {{ selectedFlags.length }}
+                    </v-chip>
+                  </v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-alert
+                      type="info"
+                      variant="tonal"
+                      density="compact"
+                      class="mb-3 text-caption"
+                    >
+                      Flags are immutable once the account is created.
+                    </v-alert>
+                    <v-checkbox
+                      v-for="flag in ACCOUNT_FLAG_OPTIONS"
+                      :key="flag.key"
+                      v-model="selectedFlags"
+                      :value="flag.bit"
+                      :label="flag.label"
+                      :hint="flag.description"
+                      persistent-hint
+                      density="compact"
+                      class="mb-2"
+                    />
+                    <v-alert
+                      v-if="hasConflictingBalanceFlags"
+                      type="warning"
+                      variant="tonal"
+                      density="compact"
+                      class="mt-2 text-caption"
+                    >
+                      Both balance constraints are set. TigerBeetle will only
+                      allow transfers that leave the balance exactly zero.
+                    </v-alert>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
                 <v-expansion-panel>
                   <v-expansion-panel-title>
                     <v-icon icon="mdi-cog" class="mr-2" />
@@ -188,8 +233,13 @@
 </template>
 
 <script setup lang="ts">
+import {
+  ACCOUNT_FLAG_OPTIONS,
+  AccountFlags,
+} from "@/constants/tigerbeetle-flags";
+import { useEnvironment } from "@/composables/useEnvironment";
 import { isValidTBID, MAX_TB_ID } from "@/utils/bigint";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 interface Props {
   modelValue: boolean;
@@ -200,6 +250,8 @@ const emit = defineEmits<{
   "update:modelValue": [value: boolean];
   created: [];
 }>();
+
+const { confirmWrite } = useEnvironment();
 
 const formRef = ref();
 const loading = ref(false);
@@ -216,9 +268,22 @@ const formData = ref({
   user_data_32: 0,
 });
 
+const selectedFlags = ref<number[]>([]);
+
+const flagsValue = computed(() =>
+  selectedFlags.value.reduce((acc, bit) => acc | bit, 0)
+);
+
+const hasConflictingBalanceFlags = computed(
+  () =>
+    selectedFlags.value.includes(AccountFlags.debits_must_not_exceed_credits) &&
+    selectedFlags.value.includes(AccountFlags.credits_must_not_exceed_debits)
+);
+
 async function handleCreate() {
   const { valid } = await formRef.value.validate();
   if (!valid) return;
+  if (!confirmWrite(`Create account "${formData.value.alias}".`)) return;
 
   loading.value = true;
   error.value = "";
@@ -233,6 +298,7 @@ async function handleCreate() {
       user_data_128: formData.value.user_data_128 || undefined,
       user_data_64: formData.value.user_data_64 || undefined,
       user_data_32: formData.value.user_data_32 || undefined,
+      flags: flagsValue.value || undefined,
     });
 
     if (result.success) {
@@ -262,6 +328,7 @@ function resetForm() {
     user_data_64: "",
     user_data_32: 0,
   };
+  selectedFlags.value = [];
   error.value = "";
   success.value = "";
 }

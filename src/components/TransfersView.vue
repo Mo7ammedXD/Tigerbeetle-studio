@@ -29,6 +29,15 @@
             />
           </v-btn>
           <v-btn
+            variant="tonal"
+            prepend-icon="mdi-link-variant"
+            class="mr-2"
+            :disabled="!isConnected"
+            @click="showMultiLeg = true"
+          >
+            Multi-leg
+          </v-btn>
+          <v-btn
             color="primary"
             prepend-icon="mdi-plus"
             @click="showCreateModal = true"
@@ -388,6 +397,12 @@
       v-model="showCreateModal"
       @created="handleTransferCreated"
     />
+
+    <MultiLegTransferModal
+      v-model="showMultiLeg"
+      :is-connected="isConnected"
+      @created="handleTransferCreated"
+    />
   </div>
 </template>
 
@@ -397,6 +412,7 @@ import type { TBTransfer } from "@/types/tigerbeetle";
 import { formatTBAmount, formatTBTimestamp } from "@/utils/bigint";
 import { computed, onActivated, onMounted, ref, watch } from "vue";
 import CreateTransferModal from "./CreateTransferModal.vue";
+import MultiLegTransferModal from "./MultiLegTransferModal.vue";
 
 const { getCurrencyForLedger, loadCurrency } = useCurrency();
 
@@ -413,6 +429,7 @@ const transfers = ref<TBTransfer[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const showCreateModal = ref(false);
+const showMultiLeg = ref(false);
 const expanded = ref<string[]>([]);
 const itemsPerPage = ref(50);
 const currentCursor = ref<string | null>(null);

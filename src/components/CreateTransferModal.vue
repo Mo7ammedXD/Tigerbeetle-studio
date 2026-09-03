@@ -99,7 +99,70 @@
             </v-col>
 
             <v-col cols="12">
-              <v-expansion-panels variant="accordion">
+              <v-expansion-panels variant="accordion" multiple>
+                <v-expansion-panel>
+                  <v-expansion-panel-title>
+                    <v-icon icon="mdi-flag" class="mr-2" />
+                    Transfer Flags
+                    <v-chip
+                      v-if="selectedFlags.length"
+                      size="x-small"
+                      color="primary"
+                      class="ml-2"
+                    >
+                      {{ selectedFlags.length }}
+                    </v-chip>
+                  </v-expansion-panel-title>
+                  <v-expansion-panel-text>
+                    <v-checkbox
+                      v-for="flag in TRANSFER_FLAG_OPTIONS"
+                      :key="flag.key"
+                      v-model="selectedFlags"
+                      :value="flag.bit"
+                      :label="flag.label"
+                      :hint="flag.description"
+                      persistent-hint
+                      density="compact"
+                      class="mb-2"
+                    />
+
+                    <v-text-field
+                      v-if="isPending"
+                      v-model.number="formData.timeout"
+                      label="Timeout (seconds)"
+                      type="number"
+                      hint="Auto-void the reservation after this many seconds. 0 means it never expires."
+                      persistent-hint
+                      variant="outlined"
+                      density="comfortable"
+                      class="mt-3"
+                      prepend-inner-icon="mdi-timer-outline"
+                      :rules="[(v) => v >= 0 || 'Must be >= 0']"
+                    />
+
+                    <v-alert
+                      v-if="isPending"
+                      type="info"
+                      variant="tonal"
+                      density="compact"
+                      class="mt-3 text-caption"
+                    >
+                      This reserves funds without posting them. Resolve it later
+                      from the Pending view.
+                    </v-alert>
+
+                    <v-alert
+                      v-if="hasBothBalancingFlags"
+                      type="warning"
+                      variant="tonal"
+                      density="compact"
+                      class="mt-3 text-caption"
+                    >
+                      Both balancing flags are set; the transfer will be limited
+                      by whichever side constrains it more.
+                    </v-alert>
+                  </v-expansion-panel-text>
+                </v-expansion-panel>
                 <v-expansion-panel>
                   <v-expansion-panel-title>
                     <v-icon icon="mdi-cog" class="mr-2" />
@@ -202,8 +265,13 @@
 </template>
 
 <script setup lang="ts">
+import {
+  TRANSFER_FLAG_OPTIONS,
+  TransferFlags,
+} from "@/constants/tigerbeetle-flags";
+import { useEnvironment } from "@/composables/useEnvironment";
 import { isValidTBID, MAX_TB_ID, parseTBAmount } from "@/utils/bigint";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 interface Props {
   modelValue: boolean;
@@ -214,6 +282,8 @@ const emit = defineEmits<{
   "update:modelValue": [value: boolean];
   created: [];
 }>();
+
+const { confirmWrite } = useEnvironment();
 
 const formRef = ref();
 const loading = ref(false);
@@ -230,11 +300,35 @@ const formData = ref({
   user_data_128: "",
   user_data_64: "",
   user_data_32: 0,
+  timeout: 0,
 });
+
+const selectedFlags = ref<number[]>([]);
+
+const flagsValue = computed(() =>
+  selectedFlags.value.reduce((acc, bit) => acc | bit, 0)
+);
+
+const isPending = computed(() =>
+  selectedFlags.value.includes(TransferFlags.pending)
+);
+
+const hasBothBalancingFlags = computed(
+  () =>
+    selectedFlags.value.includes(TransferFlags.balancing_debit) &&
+    selectedFlags.value.includes(TransferFlags.balancing_credit)
+);
 
 async function handleCreate() {
   const { valid } = await formRef.value.validate();
   if (!valid) return;
+  if (
+    !confirmWrite(
+      `Create a transfer of ${formData.value.amount} on ledger ${formData.value.ledger}.`
+    )
+  ) {
+    return;
+  }
 
   loading.value = true;
   error.value = "";
@@ -254,6 +348,8 @@ async function handleCreate() {
       user_data_128: formData.value.user_data_128 || undefined,
       user_data_64: formData.value.user_data_64 || undefined,
       user_data_32: formData.value.user_data_32 || undefined,
+      flags: flagsValue.value || undefined,
+      timeout: isPending.value ? formData.value.timeout || undefined : undefined,
     });
 
     if (result.success) {
@@ -284,7 +380,9 @@ function resetForm() {
     user_data_128: "",
     user_data_64: "",
     user_data_32: 0,
+    timeout: 0,
   };
+  selectedFlags.value = [];
   error.value = "";
   success.value = "";
 }

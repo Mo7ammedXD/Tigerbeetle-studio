@@ -312,6 +312,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { refreshEnvironment } from "@/composables/useEnvironment";
 
 interface Props {
   isConnected: boolean;
@@ -478,6 +479,7 @@ function saveToLocalStorage() {
       JSON.stringify(currentCluster.value)
     );
   }
+  refreshEnvironment();
 }
 
 onMounted(async () => {

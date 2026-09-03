@@ -256,6 +256,19 @@
 
           <template #item.actions="{ item }">
             <v-btn
+              icon="mdi-file-document-outline"
+              size="small"
+              variant="text"
+              color="primary"
+              @click="openStatement(item)"
+              class="mr-1"
+            >
+              <v-icon>mdi-file-document-outline</v-icon>
+              <v-tooltip activator="parent" location="top">
+                Open statement
+              </v-tooltip>
+            </v-btn>
+            <v-btn
               icon="mdi-information"
               size="small"
               variant="text"
@@ -418,11 +431,18 @@
       v-model="showCreateModal"
       @created="handleAccountCreated"
     />
+    <AccountDetail
+      v-model="showStatement"
+      :account-id="statementAccount?.id ?? null"
+      :account="statementAccount"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { useCurrency } from "@/composables/useCurrency";
+import { useEnvironment } from "@/composables/useEnvironment";
 import type { TBAccount } from "@/types/tigerbeetle";
 import {
   formatTBAmount,
@@ -430,9 +450,11 @@ import {
   isPositiveTBAmount,
 } from "@/utils/bigint";
 import { computed, onActivated, onMounted, ref, watch } from "vue";
+import AccountDetail from "./AccountDetail.vue";
 import CreateAccountModal from "./CreateAccountModal.vue";
 
 const { getCurrencyForLedger, loadCurrency } = useCurrency();
+const { confirmWrite } = useEnvironment();
 
 interface Props {
   isConnected: boolean;
@@ -618,6 +640,9 @@ function formatDateRangeChip(): string {
 }
 
 async function deleteAccountConfirm(account: any) {
+  if (!confirmWrite(`Remove the local alias for account ${account.id}.`)) {
+    return;
+  }
   if (
     confirm(
       `Delete account "${account.alias}" (${account.id})? This will only remove it from the local database.`
@@ -647,6 +672,14 @@ function formatTimestamp(timestamp: string): string {
 
 function getBalanceColor(balance: string): string {
   return isPositiveTBAmount(balance) ? "success" : "error";
+}
+
+const statementAccount = ref<any | null>(null);
+const showStatement = ref(false);
+
+function openStatement(account: any) {
+  statementAccount.value = account;
+  showStatement.value = true;
 }
 
 function showAccountDetails(account: any) {

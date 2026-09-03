@@ -25,6 +25,8 @@ export interface TransferData {
   user_data_64?: string;
   user_data_32?: number;
   flags?: number;
+  pending_id?: string;
+  timeout?: number;
 }
 
 export interface ApiResponse<T = any> {
@@ -70,6 +72,34 @@ export interface QueryTransfersFilter {
   account_id?: string;
 }
 
+export interface AccountBalance {
+  debits_pending: string;
+  debits_posted: string;
+  credits_pending: string;
+  credits_posted: string;
+  balance: string;
+  timestamp: string;
+}
+
+export interface BatchFailure {
+  index: number;
+  id: string;
+  result: unknown;
+}
+
+export interface BatchResult {
+  requested: number;
+  created: number;
+  ids: string[];
+  failures: BatchFailure[];
+}
+
+export interface PendingResolution {
+  id: string;
+  pending_id: string;
+  action: "post" | "void";
+}
+
 export interface TigerBeetleApi {
   connect: (config: ConnectionConfig) => Promise<ApiResponse>;
   disconnect: () => Promise<ApiResponse>;
@@ -109,6 +139,23 @@ export interface TigerBeetleApi {
     accountId: string,
     limit?: number
   ) => Promise<ApiResponse<any[]>>;
+  getAccountBalances: (
+    accountId: string,
+    limit?: number
+  ) => Promise<ApiResponse<AccountBalance[]>>;
+  createAccountsBatch: (
+    items: AccountData[]
+  ) => Promise<ApiResponse<BatchResult>>;
+  createTransfersBatch: (
+    items: TransferData[]
+  ) => Promise<ApiResponse<BatchResult>>;
+  postPendingTransfer: (
+    pendingId: string,
+    amount?: string
+  ) => Promise<ApiResponse<PendingResolution>>;
+  voidPendingTransfer: (
+    pendingId: string
+  ) => Promise<ApiResponse<PendingResolution>>;
 }
 
 declare global {

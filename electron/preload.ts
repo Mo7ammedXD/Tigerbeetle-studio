@@ -31,6 +31,8 @@ export interface TransferData {
   user_data_64?: string;
   user_data_32?: number;
   flags?: number;
+  pending_id?: string;
+  timeout?: number;
 }
 
 export interface ApiResponse<T = any> {
@@ -136,6 +138,32 @@ const api = {
 
   queryTransfers: (filter: any): Promise<ApiResponse<any[]>> => {
     return ipcRenderer.invoke("query-transfers", filter);
+  },
+
+  getAccountBalances: (
+    accountId: string,
+    limit?: number
+  ): Promise<ApiResponse<any[]>> => {
+    return ipcRenderer.invoke("get-account-balances", accountId, limit);
+  },
+
+  createAccountsBatch: (items: AccountData[]): Promise<ApiResponse<any>> => {
+    return ipcRenderer.invoke("create-accounts-batch", items);
+  },
+
+  createTransfersBatch: (items: TransferData[]): Promise<ApiResponse<any>> => {
+    return ipcRenderer.invoke("create-transfers-batch", items);
+  },
+
+  postPendingTransfer: (
+    pendingId: string,
+    amount?: string
+  ): Promise<ApiResponse<any>> => {
+    return ipcRenderer.invoke("post-pending-transfer", pendingId, amount);
+  },
+
+  voidPendingTransfer: (pendingId: string): Promise<ApiResponse<any>> => {
+    return ipcRenderer.invoke("void-pending-transfer", pendingId);
   },
 
   getAccountTransfers: (

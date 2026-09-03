@@ -11,6 +11,15 @@
       </template>
       <template #append>
         <v-chip
+          :color="environmentColor"
+          variant="tonal"
+          size="small"
+          class="mr-2"
+        >
+          {{ currentEnvironment }}
+        </v-chip>
+
+        <v-chip
           :color="isConnected ? 'success' : 'error'"
           :prepend-icon="isConnected ? 'mdi-check-circle' : 'mdi-close-circle'"
           variant="flat"
@@ -72,6 +81,15 @@
           color="primary"
         />
 
+        <v-list-item
+          prepend-icon="mdi-clock-outline"
+          title="Pending"
+          value="pending"
+          :active="activeView === 'pending'"
+          @click="activeView = 'pending'"
+          color="primary"
+        />
+
         <v-divider class="my-2" />
         <v-list-subheader>TOOLS</v-list-subheader>
 
@@ -81,6 +99,14 @@
           value="backup"
           :active="activeView === 'backup'"
           @click="activeView = 'backup'"
+          color="primary"
+        />
+        <v-list-item
+          prepend-icon="mdi-database-search"
+          title="Query"
+          value="query"
+          :active="activeView === 'query'"
+          @click="activeView = 'query'"
           color="primary"
         />
         <v-list-item
@@ -97,6 +123,14 @@
           value="bulk"
           :active="activeView === 'bulk'"
           @click="activeView = 'bulk'"
+          color="primary"
+        />
+        <v-list-item
+          prepend-icon="mdi-scale-balance"
+          title="Trial Balance"
+          value="trialbalance"
+          :active="activeView === 'trialbalance'"
+          @click="activeView = 'trialbalance'"
           color="primary"
         />
 
@@ -150,6 +184,20 @@
     </v-navigation-drawer>
 
     <v-main>
+      <v-alert
+        v-if="isProduction && isConnected"
+        type="error"
+        variant="flat"
+        density="compact"
+        tile
+        class="text-center font-weight-medium"
+      >
+        <v-icon icon="mdi-alert" size="small" class="mr-1" />
+        PRODUCTION
+        <span v-if="currentClusterName">— {{ currentClusterName }}</span>
+        — writes affect live data
+      </v-alert>
+
       <v-container fluid class="pa-6">
         <Dashboard
           v-if="activeView === 'dashboard'"
@@ -166,8 +214,18 @@
           @refresh="checkConnection"
         />
 
+        <PendingTransfers
+          v-else-if="activeView === 'pending'"
+          :is-connected="isConnected"
+          @refresh="checkConnection"
+        />
+
         <BackupExport
           v-else-if="activeView === 'backup'"
+          :is-connected="isConnected"
+        />
+        <QueryBuilder
+          v-else-if="activeView === 'query'"
           :is-connected="isConnected"
         />
         <AdvancedSearch
@@ -178,6 +236,10 @@
           v-else-if="activeView === 'bulk'"
           :is-connected="isConnected"
           @refresh="checkConnection"
+        />
+        <TrialBalance
+          v-else-if="activeView === 'trialbalance'"
+          :is-connected="isConnected"
         />
         <TransferTemplates
           v-else-if="activeView === 'templates'"
@@ -230,19 +292,26 @@ import DataVisualization from "./components/DataVisualization.vue";
 import FlowVisualizer from "./components/FlowVisualizer.vue";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog.vue";
 import LedgerConfig from "./components/LedgerConfig.vue";
+import PendingTransfers from "./components/PendingTransfers.vue";
+import QueryBuilder from "./components/QueryBuilder.vue";
 
 import TransfersView from "./components/TransfersView.vue";
+import TrialBalance from "./components/TrialBalance.vue";
 import TransferTemplates from "./components/TransferTemplates.vue";
+import { useEnvironment } from "./composables/useEnvironment";
 import { useKeyboardShortcuts } from "./composables/useKeyboardShortcuts";
 
 type ViewType =
   | "dashboard"
   | "accounts"
   | "transfers"
+  | "pending"
   | "bulk"
   | "backup"
+  | "query"
   | "search"
   | "templates"
+  | "trialbalance"
   | "clusters"
   | "ledgerconfig"
   | "visualization"
@@ -255,6 +324,13 @@ const connectionHealth = ref<"healthy" | "checking" | "disconnected">(
 );
 const shortcutsDialog = ref<InstanceType<typeof KeyboardShortcutsDialog>>();
 const theme = useTheme();
+const {
+  isProduction,
+  currentEnvironment,
+  currentClusterName,
+  environmentColor,
+  refreshEnvironment,
+} = useEnvironment();
 // Seed from the theme Vuetify actually starts on, not a hardcoded false.
 const darkMode = ref(theme.global.current.value.dark);
 let healthCheckInterval: number | null = null;
@@ -358,6 +434,7 @@ function stopHealthCheck() {
 
 function handleConnected() {
   showConnectionModal.value = false;
+  refreshEnvironment();
   checkConnection();
 }
 

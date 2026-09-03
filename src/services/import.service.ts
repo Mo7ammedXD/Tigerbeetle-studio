@@ -164,40 +164,43 @@ export class ImportService {
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];
-    const batchSize = options.batchSize || this.BATCH_SIZE;
+    const batchSize = Math.min(
+      options.batchSize || this.BATCH_SIZE,
+      this.BATCH_SIZE
+    );
 
     for (let i = 0; i < accounts.length; i += batchSize) {
       const batch = accounts.slice(i, i + batchSize);
 
       try {
-        for (const account of batch) {
-          try {
-            const accountData = DataMapperService.accountToAccountData(account);
-            const result = await this.retryOperation(async () => {
-              return await window.tigerBeetleApi.createAccount(accountData);
-            });
+        const payload = batch.map((account) =>
+          DataMapperService.accountToAccountData(account)
+        );
 
-            if (result.success) {
-              imported++;
-            } else {
-              if (options.skipDuplicates && result.error?.includes("exists")) {
-                skipped++;
-              } else {
-                errors.push(
-                  `Failed to import account ${account.id}: ${result.error}`
-                );
-              }
-            }
-          } catch (error) {
-            if (options.skipDuplicates) {
-              skipped++;
-            } else {
-              errors.push(
-                `Error importing account ${account.id}: ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }`
-              );
-            }
+        // One round trip per batch rather than one per account - this is what
+        // TigerBeetle is built for.
+        const result = await this.retryOperation(async () => {
+          return await window.tigerBeetleApi.createAccountsBatch(payload);
+        });
+
+        if (!result.success || !result.data) {
+          errors.push(
+            `Failed to import accounts ${i}-${i + batch.length}: ${result.error}`
+          );
+          continue;
+        }
+
+        imported += result.data.created;
+
+        for (const failure of result.data.failures) {
+          const account = batch[failure.index];
+          const reason = JSON.stringify(failure.result);
+          if (options.skipDuplicates && /exists/i.test(reason)) {
+            skipped++;
+          } else {
+            errors.push(
+              `Failed to import account ${account?.id ?? failure.id}: ${reason}`
+            );
           }
         }
       } catch (error) {
@@ -222,41 +225,43 @@ export class ImportService {
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];
-    const batchSize = options.batchSize || this.BATCH_SIZE;
+    const batchSize = Math.min(
+      options.batchSize || this.BATCH_SIZE,
+      this.BATCH_SIZE
+    );
 
     for (let i = 0; i < transfers.length; i += batchSize) {
       const batch = transfers.slice(i, i + batchSize);
 
       try {
-        for (const transfer of batch) {
-          try {
-            const transferData =
-              DataMapperService.transferToTransferData(transfer);
-            const result = await this.retryOperation(async () => {
-              return await window.tigerBeetleApi.createTransfer(transferData);
-            });
+        const payload = batch.map((transfer) =>
+          DataMapperService.transferToTransferData(transfer)
+        );
 
-            if (result.success) {
-              imported++;
-            } else {
-              if (options.skipDuplicates && result.error?.includes("exists")) {
-                skipped++;
-              } else {
-                errors.push(
-                  `Failed to import transfer ${transfer.id}: ${result.error}`
-                );
-              }
-            }
-          } catch (error) {
-            if (options.skipDuplicates) {
-              skipped++;
-            } else {
-              errors.push(
-                `Error importing transfer ${transfer.id}: ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }`
-              );
-            }
+        const result = await this.retryOperation(async () => {
+          return await window.tigerBeetleApi.createTransfersBatch(payload);
+        });
+
+        if (!result.success || !result.data) {
+          errors.push(
+            `Failed to import transfers ${i}-${i + batch.length}: ${
+              result.error
+            }`
+          );
+          continue;
+        }
+
+        imported += result.data.created;
+
+        for (const failure of result.data.failures) {
+          const transfer = batch[failure.index];
+          const reason = JSON.stringify(failure.result);
+          if (options.skipDuplicates && /exists/i.test(reason)) {
+            skipped++;
+          } else {
+            errors.push(
+              `Failed to import transfer ${transfer?.id ?? failure.id}: ${reason}`
+            );
           }
         }
       } catch (error) {

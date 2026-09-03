@@ -534,33 +534,44 @@ async function executeAccountsBulk() {
     return;
   }
 
-  for (const account of validAccounts) {
-    try {
-      const result = await window.tigerBeetleApi.createAccount({
+  // One batched round trip instead of one call per row.
+  try {
+    const result = await window.tigerBeetleApi.createAccountsBatch(
+      validAccounts.map((account) => ({
         alias: account.alias,
         ledger: account.ledger,
         code: account.code,
         user_data_128: account.user_data_128 || undefined,
         user_data_64: account.user_data_64 || undefined,
         user_data_32: account.user_data_32 || undefined,
-      });
+      }))
+    );
 
-      results.value.push({
-        ...account,
-        success: result.success,
-        error: result.error,
+    if (result.success && result.data) {
+      const failures = new Map(
+        result.data.failures.map((f) => [f.index, JSON.stringify(f.result)])
+      );
+      validAccounts.forEach((account, index) => {
+        const failure = failures.get(index);
+        results.value.push({
+          ...account,
+          id: result.data?.ids[index],
+          success: !failure,
+          error: failure,
+        });
       });
-    } catch (err) {
-      results.value.push({
-        ...account,
-        success: false,
-        error: err instanceof Error ? err.message : "Unknown error",
+    } else {
+      error.value = result.error || "Batch create failed";
+      validAccounts.forEach((account) => {
+        results.value.push({ ...account, success: false, error: result.error });
       });
     }
-
-    processedCount.value++;
-    progress.value = (processedCount.value / totalCount.value) * 100;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Unknown error";
   }
+
+  processedCount.value = validAccounts.length;
+  progress.value = 100;
 
   processing.value = false;
   success.value = `Processed ${processedCount.value} accounts: ${successCount.value} succeeded, ${errorCount.value} failed`;
@@ -592,32 +603,42 @@ async function executeTransfersBulk() {
     return;
   }
 
-  for (const transfer of validTransfers) {
-    try {
-      const result = await window.tigerBeetleApi.createTransfer({
+  try {
+    const result = await window.tigerBeetleApi.createTransfersBatch(
+      validTransfers.map((transfer) => ({
         debit_account_id: transfer.debit_account_id,
         credit_account_id: transfer.credit_account_id,
         amount: transfer.amount,
         ledger: transfer.ledger,
         code: transfer.code,
-      });
+      }))
+    );
 
-      results.value.push({
-        ...transfer,
-        success: result.success,
-        error: result.error,
+    if (result.success && result.data) {
+      const failures = new Map(
+        result.data.failures.map((f) => [f.index, JSON.stringify(f.result)])
+      );
+      validTransfers.forEach((transfer, index) => {
+        const failure = failures.get(index);
+        results.value.push({
+          ...transfer,
+          id: result.data?.ids[index],
+          success: !failure,
+          error: failure,
+        });
       });
-    } catch (err) {
-      results.value.push({
-        ...transfer,
-        success: false,
-        error: err instanceof Error ? err.message : "Unknown error",
+    } else {
+      error.value = result.error || "Batch create failed";
+      validTransfers.forEach((transfer) => {
+        results.value.push({ ...transfer, success: false, error: result.error });
       });
     }
-
-    processedCount.value++;
-    progress.value = (processedCount.value / totalCount.value) * 100;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Unknown error";
   }
+
+  processedCount.value = validTransfers.length;
+  progress.value = 100;
 
   processing.value = false;
   success.value = `Processed ${processedCount.value} transfers: ${successCount.value} succeeded, ${errorCount.value} failed`;
