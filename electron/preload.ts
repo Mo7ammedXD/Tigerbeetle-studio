@@ -142,9 +142,14 @@ const api = {
 
   getAccountBalances: (
     accountId: string,
-    limit?: number
+    options?: {
+      limit?: number;
+      timestamp_min?: string;
+      timestamp_max?: string;
+      reversed?: boolean;
+    }
   ): Promise<ApiResponse<any[]>> => {
-    return ipcRenderer.invoke("get-account-balances", accountId, limit);
+    return ipcRenderer.invoke("get-account-balances", accountId, options);
   },
 
   createAccountsBatch: (items: AccountData[]): Promise<ApiResponse<any>> => {

@@ -1118,7 +1118,18 @@ async function resolvePendingTransfer(
  * Balance history for an account. Requires the account to have been created
  * with the `history` flag; without it TigerBeetle returns nothing.
  */
-async function getAccountBalances(accountId: string, limit: number = 100) {
+interface BalanceHistoryOptions {
+  limit?: number;
+  timestamp_min?: string;
+  timestamp_max?: string;
+  /** Take the most recent changes in the window rather than the oldest. */
+  reversed?: boolean;
+}
+
+async function getAccountBalances(
+  accountId: string,
+  options: BalanceHistoryOptions = {},
+) {
   if (!tigerBeetleClient) {
     throw new Error("Not connected to TigerBeetle");
   }
@@ -1129,10 +1140,17 @@ async function getAccountBalances(accountId: string, limit: number = 100) {
     user_data_64: 0n,
     user_data_32: 0,
     code: 0,
-    timestamp_min: 0n,
-    timestamp_max: 0n,
-    limit: Math.min(limit, MAX_BATCH_SIZE),
-    flags: AccountFilterFlags.debits | AccountFilterFlags.credits,
+    // Zero means unbounded on that end.
+    timestamp_min: deserializeBigInt(options.timestamp_min),
+    timestamp_max: deserializeBigInt(options.timestamp_max),
+    limit: Math.min(options.limit ?? 200, batchLimit),
+    // A busy account has more balance changes than one message can carry, so
+    // `reversed` decides which end of the window gets truncated. Callers
+    // plotting "up to now" want the most recent ones.
+    flags:
+      AccountFilterFlags.debits |
+      AccountFilterFlags.credits |
+      (options.reversed ? AccountFilterFlags.reversed : 0),
   };
 
   const balances = await tigerBeetleClient.getAccountBalances(filter);
@@ -1393,9 +1411,9 @@ function setupIpcHandlers() {
 
   ipcMain.handle(
     "get-account-balances",
-    async (_event, accountId: string, limit?: number) => {
+    async (_event, accountId: string, options?: BalanceHistoryOptions) => {
       try {
-        const result = await getAccountBalances(accountId, limit ?? 100);
+        const result = await getAccountBalances(accountId, options ?? {});
         return { success: true, data: result };
       } catch (error: any) {
         return { success: false, error: error.message };

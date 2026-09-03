@@ -137,7 +137,13 @@ counterpart, and `history`.
 
 Every row opens a **statement**: the account's transfers in time order with a
 running balance derived backwards from the current posted balance, plus a
-balance-over-time chart for accounts created with the `history` flag.
+**balance-over-time** chart for accounts created with the `history` flag.
+
+The chart covers a selectable period — 24h, 7d, 30d, 90d, all, or a custom date
+range — and reports the opening balance, closing balance and change across it.
+An account with more balance changes than fit in one request shows the most
+recent window and says so, since "opening" is then the start of what is shown
+rather than of the period.
 
 ### Transfers
 Same table and filter model as Accounts. Create single transfers with amount

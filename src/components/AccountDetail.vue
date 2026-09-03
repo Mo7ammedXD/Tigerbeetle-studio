@@ -91,9 +91,54 @@
 
         <!-- Balance history -->
         <v-card variant="outlined" class="mb-4">
-          <v-card-title class="text-subtitle-1">
-            <v-icon icon="mdi-chart-line" size="small" class="mr-2" />
-            Balance over time
+          <v-card-title
+            class="text-subtitle-1 d-flex align-center justify-space-between flex-wrap ga-2"
+          >
+            <span>
+              <v-icon icon="mdi-chart-line" size="small" class="mr-2" />
+              Balance over time
+            </span>
+
+            <div
+              v-if="hasHistoryFlag"
+              class="d-flex align-center flex-wrap ga-2"
+            >
+              <v-btn-toggle
+                v-model="period"
+                density="compact"
+                variant="outlined"
+                mandatory
+                @update:model-value="onPeriodChange"
+              >
+                <v-btn value="24h" size="small">24h</v-btn>
+                <v-btn value="7d" size="small">7d</v-btn>
+                <v-btn value="30d" size="small">30d</v-btn>
+                <v-btn value="90d" size="small">90d</v-btn>
+                <v-btn value="all" size="small">All</v-btn>
+                <v-btn value="custom" size="small">Custom</v-btn>
+              </v-btn-toggle>
+
+              <template v-if="period === 'custom'">
+                <v-text-field
+                  v-model="customRange.start"
+                  type="date"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="max-width: 165px"
+                  @update:model-value="loadBalances"
+                />
+                <v-text-field
+                  v-model="customRange.end"
+                  type="date"
+                  density="compact"
+                  variant="outlined"
+                  hide-details
+                  style="max-width: 165px"
+                  @update:model-value="loadBalances"
+                />
+              </template>
+            </div>
           </v-card-title>
           <v-card-text>
             <v-alert
@@ -107,12 +152,71 @@
               balance history. The flag is immutable — set it when creating an
               account to enable this chart.
             </v-alert>
-            <div v-else-if="balances.length === 0" class="text-medium-emphasis">
-              No balance history recorded yet.
+            <div
+              v-else-if="balances.length === 0"
+              class="text-medium-emphasis"
+            >
+              {{
+                period === "all"
+                  ? "No balance history recorded yet."
+                  : "No balance changes in this period."
+              }}
             </div>
-            <div v-else style="position: relative; height: 260px">
-              <canvas ref="balanceCanvas" />
-            </div>
+            <template v-else>
+              <!-- Opening / closing / change for the selected period -->
+              <div class="d-flex flex-wrap ga-6 mb-3">
+                <div>
+                  <div class="text-caption text-medium-emphasis text-uppercase">
+                    {{ isTruncated ? "First shown" : "Opening" }}
+                  </div>
+                  <div class="text-subtitle-1">
+                    {{ formatAmount(periodSummary.opening) }}
+                  </div>
+                </div>
+                <div>
+                  <div class="text-caption text-medium-emphasis text-uppercase">
+                    Closing
+                  </div>
+                  <div class="text-subtitle-1">
+                    {{ formatAmount(periodSummary.closing) }}
+                  </div>
+                </div>
+                <div>
+                  <div class="text-caption text-medium-emphasis text-uppercase">
+                    Change
+                  </div>
+                  <div
+                    class="text-subtitle-1 font-weight-medium"
+                    :class="periodSummary.changeClass"
+                  >
+                    {{ periodSummary.changeSign
+                    }}{{ formatAmount(periodSummary.changeAbs) }}
+                  </div>
+                </div>
+                <div>
+                  <div class="text-caption text-medium-emphasis text-uppercase">
+                    Data points
+                  </div>
+                  <div class="text-subtitle-1">{{ balances.length }}</div>
+                </div>
+              </div>
+
+              <v-alert
+                v-if="isTruncated"
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="mb-3 text-caption"
+              >
+                This account has more balance changes than fit in one request.
+                Showing the most recent {{ BALANCE_POINT_LIMIT }} in this
+                period — narrow the range to see earlier activity.
+              </v-alert>
+
+              <div style="position: relative; height: 260px">
+                <canvas ref="balanceCanvas" />
+              </div>
+            </template>
           </v-card-text>
         </v-card>
 
@@ -242,10 +346,14 @@ const emit = defineEmits<{ "update:modelValue": [value: boolean] }>();
 
 const { getCurrencyForLedger, getLedgerName } = useCurrency();
 
+type Period = "24h" | "7d" | "30d" | "90d" | "all" | "custom";
+
 const loading = ref(false);
 const error = ref<string | null>(null);
 const transfers = ref<any[]>([]);
 const balances = ref<any[]>([]);
+const period = ref<Period>("all");
+const customRange = ref({ start: "", end: "" });
 const balanceCanvas = ref<HTMLCanvasElement | null>(null);
 let chartInstance: Chart | null = null;
 
@@ -287,6 +395,84 @@ const balanceColor = computed(() => {
   }
   return "surface-variant";
 });
+
+const BALANCE_POINT_LIMIT = 200;
+const MS_PER_DAY = 86_400_000;
+const PERIOD_DAYS: Record<string, number> = {
+  "24h": 1,
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
+/** TigerBeetle timestamps are nanoseconds since the epoch. */
+function msToNs(ms: number): string {
+  return (BigInt(Math.floor(ms)) * 1_000_000n).toString();
+}
+
+function periodRange(): { timestamp_min?: string; timestamp_max?: string } {
+  if (period.value === "all") return {};
+
+  if (period.value === "custom") {
+    const range: { timestamp_min?: string; timestamp_max?: string } = {};
+    if (customRange.value.start) {
+      range.timestamp_min = msToNs(new Date(customRange.value.start).getTime());
+    }
+    if (customRange.value.end) {
+      const end = new Date(customRange.value.end);
+      end.setHours(23, 59, 59, 999);
+      range.timestamp_max = msToNs(end.getTime());
+    }
+    return range;
+  }
+
+  const days = PERIOD_DAYS[period.value] ?? 7;
+  return { timestamp_min: msToNs(Date.now() - days * MS_PER_DAY) };
+}
+
+/**
+ * Balance points are fetched newest-first (so a busy account keeps its most
+ * recent activity), but everything displayed reads forward in time. Sort once
+ * here rather than at each use - reading the raw array positionally silently
+ * swaps opening and closing.
+ */
+const orderedBalances = computed(() =>
+  [...balances.value].sort((a, b) =>
+    BigInt(a.timestamp) < BigInt(b.timestamp) ? -1 : 1
+  )
+);
+
+const periodSummary = computed(() => {
+  const points = orderedBalances.value;
+  if (points.length === 0) {
+    return {
+      opening: "0", closing: "0", changeAbs: "0",
+      changeSign: "", changeClass: "",
+    };
+  }
+
+  // Points arrive oldest first; the opening balance is the state at the first
+  // change in the window, the closing balance the state at the last.
+  const opening = BigInt(points[0].balance);
+  const closing = BigInt(points[points.length - 1].balance);
+  const delta = closing - opening;
+
+  return {
+    opening: opening.toString(),
+    closing: closing.toString(),
+    changeAbs: (delta < 0n ? -delta : delta).toString(),
+    changeSign: delta > 0n ? "+" : delta < 0n ? "−" : "",
+    changeClass:
+      delta > 0n ? "text-success" : delta < 0n ? "text-error" : "",
+  };
+});
+
+// One message cannot carry every balance change of a busy account, so the
+// window is the most recent BALANCE_POINT_LIMIT changes and "Opening" is the
+// start of what is shown, not the start of the period.
+const isTruncated = computed(
+  () => balances.value.length >= BALANCE_POINT_LIMIT
+);
 
 const balanceTiles = computed(() => [
   { label: "Debits posted", value: props.account?.debits_posted || "0" },
@@ -366,12 +552,10 @@ async function load() {
   error.value = null;
 
   try {
-    const [transfersResult, balancesResult] = await Promise.all([
-      window.tigerBeetleApi.getAccountTransfers(props.accountId, 200),
-      hasHistoryFlag.value
-        ? window.tigerBeetleApi.getAccountBalances(props.accountId, 200)
-        : Promise.resolve({ success: true, data: [] as any[] }),
-    ]);
+    const transfersResult = await window.tigerBeetleApi.getAccountTransfers(
+      props.accountId,
+      200
+    );
 
     if (transfersResult.success) {
       transfers.value = transfersResult.data || [];
@@ -379,16 +563,37 @@ async function load() {
       error.value = transfersResult.error || "Failed to load transfers";
     }
 
-    if (balancesResult.success) {
-      balances.value = balancesResult.data || [];
-      await nextTick();
-      renderBalanceChart();
-    }
+    await loadBalances();
   } catch (err: any) {
     error.value = err?.message || "Failed to load account";
   } finally {
     loading.value = false;
   }
+}
+
+async function loadBalances() {
+  if (!props.accountId || !hasHistoryFlag.value) {
+    balances.value = [];
+    return;
+  }
+
+  const result = await window.tigerBeetleApi.getAccountBalances(
+    props.accountId,
+    { limit: BALANCE_POINT_LIMIT, reversed: true, ...periodRange() }
+  );
+
+  if (result.success) {
+    balances.value = result.data || [];
+    await nextTick();
+    renderBalanceChart();
+  } else {
+    error.value = result.error || "Failed to load balance history";
+  }
+}
+
+function onPeriodChange() {
+  if (period.value === "custom" && !customRange.value.start) return;
+  loadBalances();
 }
 
 function renderBalanceChart() {
@@ -404,8 +609,7 @@ function renderBalanceChart() {
     : undefined;
   const scale = 10 ** (currency?.decimals ?? 2);
 
-  // Oldest first so the line reads left to right.
-  const ordered = [...balances.value].reverse();
+  const ordered = orderedBalances.value;
 
   chartInstance = new Chart(ctx, {
     type: "line",
@@ -438,6 +642,8 @@ watch(
     if (open) {
       transfers.value = [];
       balances.value = [];
+      period.value = "all";
+      customRange.value = { start: "", end: "" };
       load();
     } else {
       chartInstance?.destroy();

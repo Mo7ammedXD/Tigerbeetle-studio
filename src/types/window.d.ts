@@ -72,6 +72,15 @@ export interface QueryTransfersFilter {
   account_id?: string;
 }
 
+export interface BalanceHistoryOptions {
+  limit?: number;
+  /** Nanosecond timestamp. Omit or 0 for unbounded. */
+  timestamp_min?: string;
+  timestamp_max?: string;
+  /** Take the most recent changes in the window rather than the oldest. */
+  reversed?: boolean;
+}
+
 export interface AccountBalance {
   debits_pending: string;
   debits_posted: string;
@@ -141,7 +150,7 @@ export interface TigerBeetleApi {
   ) => Promise<ApiResponse<any[]>>;
   getAccountBalances: (
     accountId: string,
-    limit?: number
+    options?: BalanceHistoryOptions
   ) => Promise<ApiResponse<AccountBalance[]>>;
   createAccountsBatch: (
     items: AccountData[]
